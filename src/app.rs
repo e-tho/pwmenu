@@ -1,0 +1,362 @@
+use crate::{
+    icons::Icons,
+    menu::{
+        DeviceMenuOptions, InputMenuOptions, MainMenuOptions, Menu, OutputMenuOptions,
+        VolumeMenuOptions,
+    },
+    notification::NotificationManager,
+    pw::controller::Controller,
+    pw::nodes::Node,
+};
+use anyhow::Result;
+use rust_i18n::t;
+use std::sync::Arc;
+use tokio::sync::mpsc::UnboundedSender;
+
+const VOLUME_STEP: f32 = 0.05; // 5% volume change per step
+
+pub struct App {
+    pub running: bool,
+    pub reset_mode: bool,
+    controller: Controller,
+    log_sender: UnboundedSender<String>,
+    notification_manager: Arc<NotificationManager>,
+}
+
+impl App {
+    pub async fn new(
+        _menu: Menu,
+        log_sender: UnboundedSender<String>,
+        icons: Arc<Icons>,
+    ) -> Result<Self> {
+        let controller = Controller::new(log_sender.clone()).await?;
+        let notification_manager = Arc::new(NotificationManager::new(icons.clone()));
+
+        try_send_log!(log_sender, t!("notifications.pw.initialized").to_string());
+
+        Ok(Self {
+            running: true,
+            reset_mode: false,
+            controller,
+            log_sender,
+            notification_manager,
+        })
+    }
+
+    pub fn quit(&mut self) {
+        self.running = false;
+    }
+
+    pub async fn run(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<Option<String>> {
+        while self.running {
+            match menu.show_main_menu(menu_command, icon_type, spaces).await? {
+                Some(main_menu_option) => {
+                    self.handle_main_options(
+                        menu,
+                        menu_command,
+                        icon_type,
+                        spaces,
+                        main_menu_option,
+                    )
+                    .await?;
+                }
+                None => {
+                    try_send_log!(
+                        self.log_sender,
+                        t!("notifications.pw.main_menu_exited").to_string()
+                    );
+                    self.running = false;
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn handle_main_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+        main_menu_option: MainMenuOptions,
+    ) -> Result<Option<String>> {
+        match main_menu_option {
+            MainMenuOptions::ShowOutputMenu => {
+                self.handle_output_menu(menu, menu_command, icon_type, spaces)
+                    .await?;
+            }
+            MainMenuOptions::ShowInputMenu => {
+                self.handle_input_menu(menu, menu_command, icon_type, spaces)
+                    .await?;
+            }
+        }
+        Ok(None)
+    }
+
+    async fn handle_output_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<()> {
+        match menu
+            .show_output_menu(menu_command, &self.controller, icon_type, spaces)
+            .await?
+        {
+            Some(OutputMenuOptions::RefreshList) => {
+                try_send_log!(
+                    self.log_sender,
+                    t!("notifications.pw.outputs_refreshed").to_string()
+                );
+                try_send_notification!(
+                    self.notification_manager,
+                    Some(t!("notifications.pw.outputs_refreshed").to_string()),
+                    None,
+                    Some("refresh"),
+                    None
+                );
+            }
+            Some(OutputMenuOptions::Device(output)) => {
+                self.handle_device_selection(menu, menu_command, &output, icon_type, spaces, true)
+                    .await?;
+            }
+            None => {
+                try_send_log!(
+                    self.log_sender,
+                    t!("notifications.pw.output_menu_exited").to_string()
+                );
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_input_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<()> {
+        match menu
+            .show_input_menu(menu_command, &self.controller, icon_type, spaces)
+            .await?
+        {
+            Some(InputMenuOptions::RefreshList) => {
+                try_send_log!(
+                    self.log_sender,
+                    t!("notifications.pw.inputs_refreshed").to_string()
+                );
+                try_send_notification!(
+                    self.notification_manager,
+                    Some(t!("notifications.pw.inputs_refreshed").to_string()),
+                    None,
+                    Some("refresh"),
+                    None
+                );
+            }
+            Some(InputMenuOptions::Device(input)) => {
+                self.handle_device_selection(menu, menu_command, &input, icon_type, spaces, false)
+                    .await?;
+            }
+            None => {
+                try_send_log!(
+                    self.log_sender,
+                    t!("notifications.pw.input_menu_exited").to_string()
+                );
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_device_selection(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        output: &str,
+        icon_type: &str,
+        spaces: usize,
+        is_output: bool,
+    ) -> Result<Option<Node>> {
+        let cleaned_output = menu.clean_menu_output(output, icon_type);
+
+        let nodes = if is_output {
+            self.controller.get_output_nodes()
+        } else {
+            self.controller.get_input_nodes()
+        };
+
+        let node_clone = nodes
+            .iter()
+            .find(|node| {
+                let formatted = menu.format_node_display(node, icon_type, spaces);
+                menu.clean_menu_output(&formatted, icon_type) == cleaned_output
+            })
+            .cloned();
+
+        if let Some(node) = node_clone {
+            self.handle_device_options(menu, menu_command, &node, icon_type, spaces, is_output)
+                .await?;
+            return Ok(Some(node));
+        }
+
+        Ok(None)
+    }
+
+    async fn handle_device_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        node: &Node,
+        icon_type: &str,
+        spaces: usize,
+        is_output: bool,
+    ) -> Result<()> {
+        let option = menu
+            .show_device_options(
+                menu_command,
+                icon_type,
+                spaces,
+                node.description.as_ref().unwrap_or(&node.name),
+                node.is_default,
+                is_output,
+            )
+            .await?;
+
+        if let Some(option) = option {
+            match option {
+                DeviceMenuOptions::SetDefault => {
+                    self.perform_set_default(node, is_output).await?;
+                }
+                DeviceMenuOptions::AdjustVolume => {
+                    self.handle_volume_menu(menu, menu_command, node, icon_type, spaces, is_output)
+                        .await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_volume_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        node: &Node,
+        icon_type: &str,
+        spaces: usize,
+        is_output: bool,
+    ) -> Result<()> {
+        let option = menu
+            .show_volume_menu(menu_command, icon_type, spaces, node, is_output)
+            .await?;
+
+        if let Some(option) = option {
+            match option {
+                VolumeMenuOptions::Increase => {
+                    self.perform_volume_change(node, VOLUME_STEP).await?;
+                }
+                VolumeMenuOptions::Decrease => {
+                    self.perform_volume_change(node, -VOLUME_STEP).await?;
+                }
+                VolumeMenuOptions::Mute => {
+                    self.perform_mute_toggle(node, true).await?;
+                }
+                VolumeMenuOptions::Unmute => {
+                    self.perform_mute_toggle(node, false).await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn get_display_name(node: &Node) -> &str {
+        node.description.as_ref().unwrap_or(&node.name)
+    }
+
+    async fn perform_set_default(&self, node: &Node, is_output: bool) -> Result<()> {
+        let device_type = if is_output { "output" } else { "input" };
+
+        if is_output {
+            self.controller.set_default_sink(node.id).await?;
+        } else {
+            self.controller.set_default_source(node.id).await?;
+        }
+
+        let display_name = Self::get_display_name(node);
+        let msg = t!(
+            "notifications.pw.default_set",
+            device_type = device_type,
+            device_name = display_name
+        );
+
+        try_send_log!(self.log_sender, msg.to_string());
+        self.notification_manager
+            .send_default_changed_notification(device_type, display_name)?;
+
+        Ok(())
+    }
+
+    async fn perform_volume_change(&self, node: &Node, delta: f32) -> Result<()> {
+        let current = node.volume.linear;
+        let new_volume = (current + delta).clamp(0.0, 1.0);
+
+        self.controller.set_node_volume(node.id, new_volume).await?;
+
+        if let Some(updated_node) = self.controller.get_node(node.id) {
+            let volume_percent = updated_node.volume.percent();
+            let display_name = updated_node
+                .description
+                .as_ref()
+                .unwrap_or(&updated_node.name);
+
+            let msg = t!(
+                "notifications.pw.volume_changed",
+                device_name = display_name,
+                volume = volume_percent
+            );
+
+            try_send_log!(self.log_sender, msg.to_string());
+            self.notification_manager.send_volume_notification(
+                display_name,
+                volume_percent,
+                updated_node.volume.muted,
+                &updated_node.node_type,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    async fn perform_mute_toggle(&self, node: &Node, mute: bool) -> Result<()> {
+        self.controller.set_node_mute(node.id, mute).await?;
+
+        let display_name = node.description.as_ref().unwrap_or(&node.name);
+        let msg = if mute {
+            t!("notifications.pw.device_muted", device_name = display_name)
+        } else {
+            t!(
+                "notifications.pw.device_unmuted",
+                device_name = display_name
+            )
+        };
+
+        try_send_log!(self.log_sender, msg.to_string());
+        self.notification_manager.send_volume_notification(
+            display_name,
+            node.volume.percent(),
+            mute,
+            &node.node_type,
+        )?;
+
+        Ok(())
+    }
+}

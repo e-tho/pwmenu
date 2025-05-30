@@ -1,0 +1,136 @@
+_version: 2
+
+menus:
+  main:
+    options:
+      outputs:
+        name:
+          en: "Output Devices"
+          fr: "Périphériques de sortie"
+          de: "Ausgabegeräte"
+      inputs:
+        name:
+          en: "Input Devices"
+          fr: "Périphériques d'entrée"
+          de: "Eingabegeräte"
+  output:
+    prompt:
+      en: "Select Output Device"
+      fr: "Sélectionner périphérique de sortie"
+      de: "Ausgabegerät auswählen"
+    options:
+      refresh:
+        name:
+          en: "Refresh Outputs"
+          fr: "Rafraîchir sorties"
+          de: "Ausgaben aktualisieren"
+      device:
+        name:
+          en: "Select Output Device"
+          fr: "Sélectionner périphérique de sortie"
+          de: "Ausgabegerät auswählen"
+  input:
+    prompt:
+      en: "Select Input Device"
+      fr: "Sélectionner périphérique d'entrée"
+      de: "Eingabegerät auswählen"
+    options:
+      refresh:
+        name:
+          en: "Refresh Inputs"
+          fr: "Rafraîchir entrées"
+          de: "Eingaben aktualisieren"
+      device:
+        name:
+          en: "Select Input Device"
+          fr: "Sélectionner périphérique d'entrée"
+          de: "Eingabegerät auswählen"
+  device:
+    prompt:
+      en: "Manage %{device_name}"
+      fr: "Gérer %{device_name}"
+      de: "%{device_name} verwalten"
+    options:
+      set_default:
+        name:
+          en: "Set as Default"
+          fr: "Définir par défaut"
+          de: "Als Standard festlegen"
+      adjust_volume:
+        name:
+          en: "Adjust Volume"
+          fr: "Ajuster le volume"
+          de: "Lautstärke anpassen"
+  volume:
+    prompt:
+      en: "%{device_name} [%{volume}%]"
+      fr: "%{device_name} [%{volume}%]"
+      de: "%{device_name} [%{volume}%]"
+    options:
+      increase:
+        name:
+          en: "Increase Volume (+5%)"
+          fr: "Augmenter volume (+5%)"
+          de: "Lautstärke erhöhen (+5%)"
+      decrease:
+        name:
+          en: "Decrease Volume (-5%)"
+          fr: "Diminuer volume (-5%)"
+          de: "Lautstärke verringern (-5%)"
+      mute:
+        name:
+          en: "Mute"
+          fr: "Couper le son"
+          de: "Stummschalten"
+      unmute:
+        name:
+          en: "Unmute"
+          fr: "Activer le son"
+          de: "Stummschaltung aufheben"
+
+notifications:
+  pw:
+    initialized:
+      en: "PipeWire audio system initialized"
+      fr: "Système audio PipeWire initialisé"
+      de: "PipeWire-Audiosystem initialisiert"
+    refreshed:
+      en: "Audio system refreshed"
+      fr: "Système audio rafraîchi"
+      de: "Audiosystem aktualisiert"
+    outputs_refreshed:
+      en: "Output devices refreshed"
+      fr: "Périphériques de sortie rafraîchis"
+      de: "Ausgabegeräte aktualisiert"
+    inputs_refreshed:
+      en: "Input devices refreshed"
+      fr: "Périphériques d'entrée rafraîchis"
+      de: "Eingabegeräte aktualisiert"
+    main_menu_exited:
+      en: "Main menu exited"
+      fr: "Menu principal fermé"
+      de: "Hauptmenü beendet"
+    output_menu_exited:
+      en: "Output menu exited"
+      fr: "Menu des sorties fermé"
+      de: "Ausgabemenü beendet"
+    input_menu_exited:
+      en: "Input menu exited"
+      fr: "Menu des entrées fermé"
+      de: "Eingabemenü beendet"
+    default_set:
+      en: "Default %{device_type} set to %{device_name}"
+      fr: "%{device_type} par défaut défini à %{device_name}"
+      de: "Standard-%{device_type} auf %{device_name} gesetzt"
+    volume_changed:
+      en: "Volume for %{device_name} set to %{volume}%"
+      fr: "Volume pour %{device_name} défini à %{volume}%"
+      de: "Lautstärke für %{device_name} auf %{volume}% gesetzt"
+    device_muted:
+      en: "%{device_name} muted"
+      fr: "Son coupé pour %{device_name}"
+      de: "%{device_name} stummgeschaltet"
+    device_unmuted:
+      en: "%{device_name} unmuted"
+      fr: "Son activé pour %{device_name}"
+      de: "Stummschaltung für %{device_name} aufgehoben"
