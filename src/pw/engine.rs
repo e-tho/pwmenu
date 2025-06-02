@@ -112,6 +112,15 @@ impl PwEngine {
         })
         .await
     }
+
+    pub async fn switch_device_profile(&self, device_id: u32, profile_index: u32) -> Result<()> {
+        self.send_command_and_wait(|rs| PwCommand::SwitchDeviceProfile {
+            device_id,
+            profile_index,
+            result_sender: rs,
+        })
+        .await
+    }
 }
 
 impl Drop for PwEngine {
@@ -326,6 +335,15 @@ fn run_pipewire_loop(
                         node_id,
                         result_sender,
                     } => result_sender.send(store.borrow_mut().set_default_source(node_id)),
+                    PwCommand::SwitchDeviceProfile {
+                        device_id,
+                        profile_index,
+                        result_sender,
+                    } => result_sender.send(
+                        store
+                            .borrow_mut()
+                            .switch_device_profile(device_id, profile_index),
+                    ),
                     PwCommand::Exit => unreachable!("Exit handled above"),
                 };
 
@@ -375,10 +393,18 @@ impl Store {
         graph_tx: &watch::Sender<AudioGraph>,
     ) -> Result<bool> {
         match global.type_ {
-            ObjectType::Device => self.add_device(registry, global)?,
-            ObjectType::Node => self.add_node(registry, global, store_rc, graph_tx)?,
-            ObjectType::Port => self.add_port(registry, global)?,
-            ObjectType::Link => self.add_link(registry, global)?,
+            ObjectType::Device => {
+                self.add_device(registry, global, store_rc, graph_tx)?;
+            }
+            ObjectType::Node => {
+                self.add_node(registry, global, store_rc, graph_tx)?;
+            }
+            ObjectType::Port => {
+                self.add_port(registry, global)?;
+            }
+            ObjectType::Link => {
+                self.add_link(registry, global)?;
+            }
             _ => return Ok(false),
         }
         Ok(true)

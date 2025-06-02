@@ -2,11 +2,10 @@ use crate::{
     icons::Icons,
     menu::{
         DeviceMenuOptions, InputMenuOptions, MainMenuOptions, Menu, OutputMenuOptions,
-        VolumeMenuOptions,
+        ProfileMenuOptions, VolumeMenuOptions,
     },
     notification::NotificationManager,
-    pw::controller::Controller,
-    pw::nodes::Node,
+    pw::{controller::Controller, nodes::Node, Profile},
 };
 use anyhow::Result;
 use rust_i18n::t;
@@ -219,6 +218,13 @@ impl App {
         spaces: usize,
         is_output: bool,
     ) -> Result<()> {
+        let has_profiles = if let Some(device_id) = node.device_id {
+            let profiles = self.controller.get_device_profiles(device_id);
+            profiles.len() > 1
+        } else {
+            false
+        };
+
         let option = menu
             .show_device_options(
                 menu_command,
@@ -227,6 +233,7 @@ impl App {
                 node.description.as_ref().unwrap_or(&node.name),
                 node.is_default,
                 is_output,
+                has_profiles,
             )
             .await?;
 
@@ -235,11 +242,49 @@ impl App {
                 DeviceMenuOptions::SetDefault => {
                     self.perform_set_default(node, is_output).await?;
                 }
+                DeviceMenuOptions::SwitchProfile => {
+                    if let Some(device_id) = node.device_id {
+                        self.handle_profile_menu(menu, menu_command, device_id, icon_type, spaces)
+                            .await?;
+                    }
+                }
                 DeviceMenuOptions::AdjustVolume => {
                     self.handle_volume_menu(menu, menu_command, node, icon_type, spaces, is_output)
                         .await?;
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_profile_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        device_id: u32,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<()> {
+        let profiles = self.controller.get_device_profiles(device_id);
+        let current_profile = self.controller.get_device_current_profile(device_id);
+
+        let device_name = self.controller.get_device_name(device_id);
+
+        let option = menu
+            .show_profile_menu(
+                menu_command,
+                icon_type,
+                spaces,
+                &device_name,
+                &profiles,
+                current_profile.as_ref().map(|p| p.index),
+            )
+            .await?;
+
+        if let Some(ProfileMenuOptions::SelectProfile(profile_index)) = option {
+            self.perform_profile_switch(device_id, profile_index, &device_name, &profiles)
+                .await?;
         }
 
         Ok(())
@@ -301,6 +346,37 @@ impl App {
         try_send_log!(self.log_sender, msg.to_string());
         self.notification_manager
             .send_default_changed_notification(device_type, display_name)?;
+
+        Ok(())
+    }
+
+    async fn perform_profile_switch(
+        &self,
+        device_id: u32,
+        profile_index: u32,
+        device_name: &str,
+        profiles: &[Profile],
+    ) -> Result<()> {
+        self.controller
+            .switch_device_profile(device_id, profile_index)
+            .await?;
+
+        if let Some(profile) = profiles.iter().find(|p| p.index == profile_index) {
+            let msg = t!(
+                "notifications.pw.profile_switched",
+                device_name = device_name,
+                profile_name = &profile.description
+            );
+
+            try_send_log!(self.log_sender, msg.to_string());
+            try_send_notification!(
+                self.notification_manager,
+                None,
+                Some(msg.to_string()),
+                Some("switch_profile"),
+                None
+            );
+        }
 
         Ok(())
     }

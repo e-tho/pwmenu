@@ -4,6 +4,7 @@ use crate::{
     pw::{
         controller::Controller,
         nodes::{Node, NodeType},
+        Profile,
     },
 };
 use anyhow::Result;
@@ -83,8 +84,23 @@ impl InputMenuOptions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProfileMenuOptions {
+    SelectProfile(u32),
+}
+
+impl ProfileMenuOptions {
+    pub fn from_string_with_profiles(option: &str, profiles: &[Profile]) -> Option<Self> {
+        profiles
+            .iter()
+            .find(|profile| profile.description == option)
+            .map(|profile| ProfileMenuOptions::SelectProfile(profile.index))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DeviceMenuOptions {
     SetDefault,
+    SwitchProfile,
     AdjustVolume,
 }
 
@@ -93,6 +109,9 @@ impl DeviceMenuOptions {
         match option {
             s if s == t!("menus.device.options.set_default.name") => {
                 Some(DeviceMenuOptions::SetDefault)
+            }
+            s if s == t!("menus.device.options.switch_profile.name") => {
+                Some(DeviceMenuOptions::SwitchProfile)
             }
             s if s == t!("menus.device.options.adjust_volume.name") => {
                 Some(DeviceMenuOptions::AdjustVolume)
@@ -104,6 +123,7 @@ impl DeviceMenuOptions {
     pub fn to_str(&self) -> Cow<'static, str> {
         match self {
             DeviceMenuOptions::SetDefault => t!("menus.device.options.set_default.name"),
+            DeviceMenuOptions::SwitchProfile => t!("menus.device.options.switch_profile.name"),
             DeviceMenuOptions::AdjustVolume => t!("menus.device.options.adjust_volume.name"),
         }
     }
@@ -359,6 +379,7 @@ impl Menu {
         Ok(None)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn show_device_options(
         &self,
         launcher_command: &Option<String>,
@@ -367,11 +388,16 @@ impl Menu {
         device_name: &str,
         is_default: bool,
         is_output_menu: bool,
+        has_profiles: bool,
     ) -> Result<Option<DeviceMenuOptions>> {
         let mut options = Vec::new();
 
         if !is_default {
             options.push(("set_default", DeviceMenuOptions::SetDefault.to_str()));
+        }
+
+        if has_profiles {
+            options.push(("switch_profile", DeviceMenuOptions::SwitchProfile.to_str()));
         }
 
         let volume_icon_key = if is_output_menu {
@@ -391,6 +417,48 @@ impl Menu {
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
             return Ok(DeviceMenuOptions::from_string(&cleaned_output));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn show_profile_menu(
+        &self,
+        launcher_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+        device_name: &str,
+        profiles: &[Profile],
+        current_profile_index: Option<u32>,
+    ) -> Result<Option<ProfileMenuOptions>> {
+        if profiles.is_empty() {
+            return Ok(None);
+        }
+
+        let mut options = Vec::new();
+
+        for profile in profiles {
+            let mut display_name = profile.description.clone();
+
+            if Some(profile.index) == current_profile_index {
+                display_name.push_str(&format!(" {}", self.icons.get_icon("default", "generic")));
+            }
+
+            options.push(("profile", display_name));
+        }
+
+        let input = self.get_icon_text(options, icon_type, spaces);
+        let prompt = t!("menus.profile.prompt", device_name = device_name);
+
+        let menu_output =
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&prompt))?;
+
+        if let Some(output) = menu_output {
+            let cleaned_output = self.clean_menu_output(&output, icon_type);
+            return Ok(ProfileMenuOptions::from_string_with_profiles(
+                &cleaned_output,
+                profiles,
+            ));
         }
 
         Ok(None)

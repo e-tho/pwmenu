@@ -56,11 +56,21 @@ menus:
           en: "Set as Default"
           fr: "Définir par défaut"
           de: "Als Standard festlegen"
+      switch_profile:
+        name:
+          en: "Switch Profile"
+          fr: "Changer de profil"
+          de: "Profil wechseln"
       adjust_volume:
         name:
           en: "Adjust Volume"
           fr: "Ajuster le volume"
           de: "Lautstärke anpassen"
+  profile:
+    prompt:
+      en: "Switch profile for %{device_name}"
+      fr: "Changer le profil de %{device_name}"
+      de: "Profil für %{device_name} ändern"
   volume:
     prompt:
       en: "%{device_name} [%{volume}%]"
@@ -134,3 +144,7 @@ notifications:
       en: "%{device_name} unmuted"
       fr: "Son activé pour %{device_name}"
       de: "Stummschaltung für %{device_name} aufgehoben"
+    profile_switched:
+      en: "%{profile_name} applied to %{device_name}"
+      fr: "Profil %{profile_name} appliqué à %{device_name}"
+      de: "Profil %{profile_name} auf %{device_name} angewendet"

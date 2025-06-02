@@ -31,5 +31,10 @@ pub enum PwCommand {
         node_id: u32,
         result_sender: oneshot::Sender<Result<()>>,
     },
+    SwitchDeviceProfile {
+        device_id: u32,
+        profile_index: u32,
+        result_sender: oneshot::Sender<Result<()>>,
+    },
     Exit,
 }

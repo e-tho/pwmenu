@@ -20,7 +20,7 @@ pub mod pw {
     pub mod metadata;
     pub mod nodes;
 
-    pub use self::devices::DeviceType;
+    pub use self::devices::{DeviceType, Profile};
     pub use self::engine::PwEngine;
     pub use self::graph::{AudioGraph, ConnectionStatus};
     pub use self::links::{Link, Port, PortDirection};

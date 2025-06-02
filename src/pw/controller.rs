@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::pw::{
-    devices::DeviceType,
+    devices::{DeviceType, Profile},
     engine::PwEngine,
     nodes::{Node, NodeType},
 };
@@ -180,5 +180,58 @@ impl Controller {
 
     pub fn get_default_source(&self) -> Option<u32> {
         self.engine.graph().default_source
+    }
+
+    pub fn get_device_profiles(&self, device_id: u32) -> Vec<Profile> {
+        let graph = self.engine.graph();
+        graph
+            .devices
+            .get(&device_id)
+            .map(|device| device.profiles.clone())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|p| p.is_available() && !p.is_off())
+            .collect()
+    }
+
+    pub fn get_device_current_profile(&self, device_id: u32) -> Option<Profile> {
+        let graph = self.engine.graph();
+        graph.devices.get(&device_id).and_then(|device| {
+            device
+                .current_profile_index
+                .and_then(|index| device.profiles.iter().find(|p| p.index == index).cloned())
+        })
+    }
+
+    pub fn get_device_name(&self, device_id: u32) -> String {
+        self.engine
+            .graph()
+            .devices
+            .get(&device_id)
+            .map(|d| d.description.as_ref().unwrap_or(&d.name).clone())
+            .unwrap_or_else(|| "Unknown Device".to_string())
+    }
+
+    pub async fn switch_device_profile(&self, device_id: u32, profile_index: u32) -> Result<()> {
+        let result = self
+            .engine
+            .switch_device_profile(device_id, profile_index)
+            .await;
+
+        if result.is_ok() {
+            if let Some(device) = self.engine.graph().devices.get(&device_id) {
+                if let Some(profile) = device.profiles.iter().find(|p| p.index == profile_index) {
+                    try_send_log!(
+                        self.log_sender,
+                        format!(
+                            "Switched device {} to profile: {}",
+                            device.name, profile.description
+                        )
+                    );
+                }
+            }
+        }
+
+        result
     }
 }

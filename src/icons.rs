@@ -80,6 +80,18 @@ impl Icons {
             ),
         );
 
+        font_icons.insert("switch_profile", '\u{f0ea2}');
+        xdg_icons.insert(
+            "switch_profile",
+            IconDefinition::simple("multimedia-equalizer-symbolic"),
+        );
+
+        font_icons.insert("profile", '\u{f0384}');
+        xdg_icons.insert(
+            "profile",
+            IconDefinition::simple("audio-x-generic-symbolic"),
+        );
+
         // Output Controls
 
         font_icons.insert("output_volume", '\u{f057e}');
