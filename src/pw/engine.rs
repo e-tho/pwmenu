@@ -121,6 +121,19 @@ impl PwEngine {
         })
         .await
     }
+
+    pub async fn switch_device_profile_with_restoration(
+        &self,
+        device_id: u32,
+        profile_index: u32,
+    ) -> Result<()> {
+        self.send_command_and_wait(|rs| PwCommand::SwitchDeviceProfileWithRestoration {
+            device_id,
+            profile_index,
+            result_sender: rs,
+        })
+        .await
+    }
 }
 
 impl Drop for PwEngine {
@@ -343,6 +356,15 @@ fn run_pipewire_loop(
                         store
                             .borrow_mut()
                             .switch_device_profile(device_id, profile_index),
+                    ),
+                    PwCommand::SwitchDeviceProfileWithRestoration {
+                        device_id,
+                        profile_index,
+                        result_sender,
+                    } => result_sender.send(
+                        store
+                            .borrow_mut()
+                            .switch_device_profile_with_restoration(device_id, profile_index),
                     ),
                     PwCommand::Exit => unreachable!("Exit handled above"),
                 };

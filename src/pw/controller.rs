@@ -215,7 +215,7 @@ impl Controller {
     pub async fn switch_device_profile(&self, device_id: u32, profile_index: u32) -> Result<()> {
         let result = self
             .engine
-            .switch_device_profile(device_id, profile_index)
+            .switch_device_profile_with_restoration(device_id, profile_index)
             .await;
 
         if result.is_ok() {

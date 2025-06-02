@@ -1,13 +1,14 @@
-use log::{debug, error, info};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
-use tokio::sync::watch;
-
 use crate::pw::{
     devices::{Device, DeviceInternal},
     links::{Link, LinkInternal, Port, PortInternal},
     metadata::MetadataManager,
     nodes::{Node, NodeInternal},
+    restoration::RestorationManager,
 };
+use anyhow::Result;
+use log::{debug, error, info, warn};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use tokio::sync::watch;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum ConnectionStatus {
@@ -39,6 +40,7 @@ pub struct Store {
     pub pwmenu_client_id: Option<u32>,
     pub core: Rc<pipewire::core::Core>,
     pub metadata_manager: Option<MetadataManager>,
+    pub restoration_manager: RestorationManager,
 }
 
 impl Store {
@@ -54,6 +56,7 @@ impl Store {
             pwmenu_client_id: None,
             core,
             metadata_manager: None,
+            restoration_manager: RestorationManager::new(),
         }
     }
 
@@ -162,13 +165,60 @@ impl Store {
             }
         }
     }
+
+    pub fn switch_device_profile_with_restoration(
+        &mut self,
+        device_id: u32,
+        profile_index: u32,
+    ) -> Result<()> {
+        if let Some((device_name, had_default_sink, had_default_source)) =
+            RestorationManager::should_capture_defaults(self, device_id)
+        {
+            self.restoration_manager.capture_defaults(
+                device_id,
+                device_name,
+                had_default_sink,
+                had_default_source,
+                profile_index,
+            );
+        }
+
+        self.switch_device_profile(device_id, profile_index)
+    }
 }
 
 pub fn update_graph(store_rc: &Rc<RefCell<Store>>, graph_tx: &watch::Sender<AudioGraph>) {
-    // Update metadata defaults before creating graph
+    let (nodes_to_restore, completed_devices) = {
+        let store = store_rc.borrow();
+        store.restoration_manager.get_pending_restorations(&store)
+    };
+
     {
         let mut store = store_rc.borrow_mut();
         store.update_defaults_from_metadata();
+        store.restoration_manager.update_attempts_and_cleanup();
+        store.restoration_manager.mark_completed(&completed_devices);
+        store.restoration_manager.cleanup_expired();
+    }
+
+    if !nodes_to_restore.is_empty() {
+        let mut store = store_rc.borrow_mut();
+        for (sink_id, source_id) in nodes_to_restore {
+            if sink_id != 0 {
+                if let Err(e) = store.set_default_sink(sink_id) {
+                    warn!("Failed to restore default sink {}: {}", sink_id, e);
+                } else {
+                    debug!("Restored default sink: {}", sink_id);
+                }
+            }
+            if source_id != 0 {
+                if let Err(e) = store.set_default_source(source_id) {
+                    warn!("Failed to restore default source {}: {}", source_id, e);
+                } else {
+                    debug!("Restored default source: {}", source_id);
+                }
+            }
+        }
     }
 
     let graph = store_rc.borrow().to_graph();

@@ -36,5 +36,10 @@ pub enum PwCommand {
         profile_index: u32,
         result_sender: oneshot::Sender<Result<()>>,
     },
+    SwitchDeviceProfileWithRestoration {
+        device_id: u32,
+        profile_index: u32,
+        result_sender: oneshot::Sender<Result<()>>,
+    },
     Exit,
 }
