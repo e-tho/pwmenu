@@ -25,7 +25,7 @@ impl Controller {
     pub fn get_output_nodes(&self) -> Vec<Node> {
         let graph = self.engine.graph();
 
-        graph
+        let mut nodes: Vec<Node> = graph
             .nodes
             .values()
             .filter(|n| {
@@ -33,13 +33,23 @@ impl Controller {
                     && !n.name.to_lowercase().contains("monitor")
             })
             .cloned()
-            .collect()
+            .collect();
+
+        nodes.sort_by(|a, b| {
+            b.is_default.cmp(&a.is_default).then_with(|| {
+                let a_name = a.description.as_ref().unwrap_or(&a.name);
+                let b_name = b.description.as_ref().unwrap_or(&b.name);
+                a_name.cmp(b_name)
+            })
+        });
+
+        nodes
     }
 
     pub fn get_input_nodes(&self) -> Vec<Node> {
         let graph = self.engine.graph();
 
-        graph
+        let mut nodes: Vec<Node> = graph
             .nodes
             .values()
             .filter(|n| {
@@ -47,7 +57,17 @@ impl Controller {
                     && !n.name.to_lowercase().contains("monitor")
             })
             .cloned()
-            .collect()
+            .collect();
+
+        nodes.sort_by(|a, b| {
+            b.is_default.cmp(&a.is_default).then_with(|| {
+                let a_name = a.description.as_ref().unwrap_or(&a.name);
+                let b_name = b.description.as_ref().unwrap_or(&b.name);
+                a_name.cmp(b_name)
+            })
+        });
+
+        nodes
     }
 
     pub fn get_output_devices(&self) -> Vec<(u32, String)> {
