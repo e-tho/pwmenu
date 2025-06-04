@@ -45,12 +45,68 @@ impl Profile {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum ConnectionType {
+    Usb = 1,
+    Internal = 2,
+    DisplayAudio = 3,
+    Bluetooth = 4,
+    Unknown = 5,
+}
+
+impl ConnectionType {
+    pub fn from_properties(props: &DictRef) -> Self {
+        if let Some(bus) = props.get("device.bus") {
+            match bus {
+                "usb" => return ConnectionType::Usb,
+                "bluetooth" => return ConnectionType::Bluetooth,
+                "pci" => {
+                    if let Some(form_factor) = props.get("device.form_factor") {
+                        if form_factor == "hdmi" || form_factor == "displayport" {
+                            return ConnectionType::DisplayAudio;
+                        }
+                    }
+                    return ConnectionType::Internal;
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(device_name) = props.get("device.name") {
+            if device_name.starts_with("alsa_card.usb-") {
+                return ConnectionType::Usb;
+            }
+            if device_name.starts_with("alsa_card.pci-") {
+                if let Some(desc) = props.get("device.description") {
+                    if desc.to_lowercase().contains("hdmi")
+                        || desc.to_lowercase().contains("displayport")
+                    {
+                        return ConnectionType::DisplayAudio;
+                    }
+                }
+                if let Some(nick) = props.get("device.nick") {
+                    if nick.to_lowercase().contains("hdmi") {
+                        return ConnectionType::DisplayAudio;
+                    }
+                }
+                return ConnectionType::Internal;
+            }
+            if device_name.contains("bluez") {
+                return ConnectionType::Bluetooth;
+            }
+        }
+
+        ConnectionType::Unknown
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Device {
     pub id: u32,
     pub name: String,
     pub description: Option<String>,
     pub device_type: DeviceType,
+    pub connection_type: ConnectionType,
     pub nodes: Vec<u32>,
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
@@ -61,6 +117,7 @@ pub struct DeviceInternal {
     pub name: String,
     pub description: Option<String>,
     pub device_type: DeviceType,
+    pub connection_type: ConnectionType,
     pub nodes: Vec<u32>,
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
@@ -75,6 +132,7 @@ impl DeviceInternal {
             name: self.name.clone(),
             description: self.description.clone(),
             device_type: self.device_type,
+            connection_type: self.connection_type,
             nodes: self.nodes.clone(),
             profiles: self.profiles.clone(),
             current_profile_index: self.current_profile_index,
@@ -197,12 +255,14 @@ impl Store {
             Some("Audio/Device/Source") | Some("Audio/Source") => DeviceType::Source,
             _ => DeviceType::Unknown,
         };
+        let connection_type = ConnectionType::from_properties(props);
 
         let mut device = DeviceInternal {
             id: global.id,
             name: name.clone(),
             description,
             device_type,
+            connection_type,
             nodes: self
                 .nodes
                 .values()

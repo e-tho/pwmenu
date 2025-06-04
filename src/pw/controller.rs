@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::pw::{
-    devices::{DeviceType, Profile},
+    devices::{ConnectionType, DeviceType, Profile},
     engine::PwEngine,
     nodes::{Node, NodeType},
 };
@@ -36,11 +36,18 @@ impl Controller {
             .collect();
 
         nodes.sort_by(|a, b| {
-            b.is_default.cmp(&a.is_default).then_with(|| {
-                let a_name = a.description.as_ref().unwrap_or(&a.name);
-                let b_name = b.description.as_ref().unwrap_or(&b.name);
-                a_name.cmp(b_name)
-            })
+            b.is_default
+                .cmp(&a.is_default)
+                .then_with(|| {
+                    let a_connection = self.get_node_connection_type(a);
+                    let b_connection = self.get_node_connection_type(b);
+                    a_connection.cmp(&b_connection)
+                })
+                .then_with(|| {
+                    let a_name = a.description.as_ref().unwrap_or(&a.name);
+                    let b_name = b.description.as_ref().unwrap_or(&b.name);
+                    a_name.cmp(b_name)
+                })
         });
 
         nodes
@@ -60,14 +67,31 @@ impl Controller {
             .collect();
 
         nodes.sort_by(|a, b| {
-            b.is_default.cmp(&a.is_default).then_with(|| {
-                let a_name = a.description.as_ref().unwrap_or(&a.name);
-                let b_name = b.description.as_ref().unwrap_or(&b.name);
-                a_name.cmp(b_name)
-            })
+            b.is_default
+                .cmp(&a.is_default)
+                .then_with(|| {
+                    let a_connection = self.get_node_connection_type(a);
+                    let b_connection = self.get_node_connection_type(b);
+                    a_connection.cmp(&b_connection)
+                })
+                .then_with(|| {
+                    let a_name = a.description.as_ref().unwrap_or(&a.name);
+                    let b_name = b.description.as_ref().unwrap_or(&b.name);
+                    a_name.cmp(b_name)
+                })
         });
 
         nodes
+    }
+
+    fn get_node_connection_type(&self, node: &Node) -> ConnectionType {
+        if let Some(device_id) = node.device_id {
+            let graph = self.engine.graph();
+            if let Some(device) = graph.devices.get(&device_id) {
+                return device.connection_type;
+            }
+        }
+        ConnectionType::Unknown
     }
 
     pub fn get_output_devices(&self) -> Vec<(u32, String)> {
