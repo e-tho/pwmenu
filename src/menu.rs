@@ -241,15 +241,17 @@ impl Menu {
         let volume_str = format!(" [{}%]", node.volume.percent());
         display_name.push_str(&volume_str);
 
-        if node.volume.muted {
-            display_name.push_str(&format!(" {}", self.icons.get_icon("muted", "generic")));
-        }
-
         if node.is_default {
             display_name.push_str(&format!(" {}", self.icons.get_icon("default", "generic")));
         }
 
-        let icon = if node
+        let icon = if node.volume.muted {
+            if matches!(node.node_type, NodeType::Source) {
+                self.icons.get_icon("input_mute", icon_type)
+            } else {
+                self.icons.get_icon("output_mute", icon_type)
+            }
+        } else if node
             .media_class
             .as_ref()
             .is_some_and(|m| m.contains("Monitor"))

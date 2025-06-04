@@ -43,7 +43,6 @@ impl Icons {
         // Status Indicators
 
         generic_icons.insert("default", '\u{23FA}');
-        generic_icons.insert("muted", '\u{1F507}');
 
         // General
 
