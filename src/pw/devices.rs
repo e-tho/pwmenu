@@ -380,6 +380,25 @@ impl Store {
             .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
 
         if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
+            let mut route_direction: Option<u32> = None;
+            for prop in &obj.properties {
+                if prop.key == libspa::sys::SPA_PARAM_ROUTE_direction {
+                    if let Value::Id(spa_id) = &prop.value {
+                        route_direction = Some(spa_id.0);
+                        break;
+                    }
+                }
+            }
+
+            let should_process_route = matches!(
+                (device.device_type, route_direction),
+                (DeviceType::Sink, Some(1)) | (DeviceType::Source, Some(0))
+            );
+
+            if !should_process_route {
+                return Ok(false);
+            }
+
             let mut volume_updated = false;
             let mut mute_updated = false;
             let mut channel_volumes: Option<f32> = None;
