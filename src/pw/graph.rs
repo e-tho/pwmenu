@@ -111,56 +111,73 @@ impl Store {
     }
 
     pub fn update_defaults_from_metadata(&mut self) {
-        if let Some(metadata_manager) = &self.metadata_manager {
-            if let Some(default_sink_name) = metadata_manager.get_default_sink() {
-                debug!("Metadata default sink name: '{}'", default_sink_name);
+        let Some(metadata_manager) = &self.metadata_manager else {
+            return;
+        };
 
-                let mut found_default = false;
-                for (node_id, node) in &mut self.nodes {
-                    if matches!(node.node_type, crate::pw::nodes::NodeType::Sink) {
-                        if node.name == default_sink_name {
-                            if !node.is_default {
-                                node.is_default = true;
-                                self.default_sink = Some(*node_id);
-                                found_default = true;
-                                debug!("Set node {} as default sink from metadata", node_id);
-                            }
-                        } else if node.is_default {
-                            node.is_default = false;
-                        }
-                    }
+        if let Some(default_sink_name) = metadata_manager.get_default_sink() {
+            let mut found_default = false;
+
+            for (node_id, node) in &mut self.nodes {
+                if !matches!(node.node_type, crate::pw::nodes::NodeType::Sink) {
+                    continue;
                 }
-                if !found_default {
-                    debug!("Could not find sink node with name: {}", default_sink_name);
+
+                let name_matches = node.name == default_sink_name
+                    || node.name.trim() == default_sink_name.trim()
+                    || node.description.as_ref() == Some(&default_sink_name)
+                    || node
+                        .description
+                        .as_ref()
+                        .is_some_and(|desc| desc.trim() == default_sink_name.trim());
+
+                if name_matches {
+                    if !node.is_default {
+                        node.is_default = true;
+                        self.default_sink = Some(*node_id);
+                        debug!("Set node {} as default sink from metadata", node_id);
+                    }
+                    found_default = true;
+                } else if node.is_default {
+                    node.is_default = false;
                 }
             }
 
-            if let Some(default_source_name) = metadata_manager.get_default_source() {
-                debug!(
-                    "Found default source from metadata: {}",
-                    default_source_name
-                );
+            // Fallback: if only one sink exists, assume it's default
+            if !found_default {
+                let sink_node_ids: Vec<u32> = self
+                    .nodes
+                    .iter()
+                    .filter(|(_, n)| matches!(n.node_type, crate::pw::nodes::NodeType::Sink))
+                    .map(|(id, _)| *id)
+                    .collect();
 
-                let mut found_default = false;
-                for (node_id, node) in &mut self.nodes {
-                    if matches!(node.node_type, crate::pw::nodes::NodeType::Source) {
-                        if node.name == default_source_name {
-                            if !node.is_default {
-                                node.is_default = true;
-                                self.default_source = Some(*node_id);
-                                found_default = true;
-                                debug!("Set node {} as default source from metadata", node_id);
-                            }
-                        } else if node.is_default {
-                            node.is_default = false;
-                        }
+                if sink_node_ids.len() == 1 {
+                    if let Some(node) = self.nodes.get_mut(&sink_node_ids[0]) {
+                        node.is_default = true;
+                        self.default_sink = Some(sink_node_ids[0]);
                     }
                 }
-                if !found_default {
-                    debug!(
-                        "Could not find source node with name: {}",
-                        default_source_name
-                    );
+            }
+        }
+
+        // Similar logic for source (simplified for brevity)
+        if let Some(default_source_name) = metadata_manager.get_default_source() {
+            for (node_id, node) in &mut self.nodes {
+                if matches!(node.node_type, crate::pw::nodes::NodeType::Source) {
+                    let name_matches = node.name == default_source_name
+                        || node.name.trim() == default_source_name.trim()
+                        || node.description.as_ref() == Some(&default_source_name);
+
+                    if name_matches {
+                        if !node.is_default {
+                            node.is_default = true;
+                            self.default_source = Some(*node_id);
+                            debug!("Set node {} as default source from metadata", node_id);
+                        }
+                    } else if node.is_default {
+                        node.is_default = false;
+                    }
                 }
             }
         }

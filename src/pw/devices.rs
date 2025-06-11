@@ -1,4 +1,7 @@
-use crate::pw::graph::{AudioGraph, Store};
+use crate::pw::{
+    graph::{AudioGraph, Store},
+    volume::VolumeResolver,
+};
 use anyhow::{anyhow, Context as AnyhowContext, Result};
 use libspa::{
     pod::builder::Builder,
@@ -8,7 +11,7 @@ use libspa::{
         SPA_PARAM_PROFILE_save, SPA_TYPE_OBJECT_ParamProfile,
     },
 };
-use log::debug;
+use log::{debug, error};
 use pipewire::spa::{
     param::ParamType,
     pod::{deserialize::PodDeserializer, Pod, Value},
@@ -110,6 +113,8 @@ pub struct Device {
     pub nodes: Vec<u32>,
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
+    pub volume: f32,
+    pub muted: bool,
 }
 
 pub struct DeviceInternal {
@@ -123,6 +128,8 @@ pub struct DeviceInternal {
     pub current_profile_index: Option<u32>,
     pub proxy: pipewire::device::Device,
     pub listener: Option<pipewire::device::DeviceListener>,
+    pub volume: f32,
+    pub muted: bool,
 }
 
 impl DeviceInternal {
@@ -136,6 +143,8 @@ impl DeviceInternal {
             nodes: self.nodes.clone(),
             profiles: self.profiles.clone(),
             current_profile_index: self.current_profile_index,
+            volume: self.volume,
+            muted: self.muted,
         }
     }
 
@@ -273,19 +282,41 @@ impl Store {
             current_profile_index: None,
             proxy,
             listener: None,
+            volume: 1.0,
+            muted: false,
         };
 
-        self.setup_device_profile_monitoring(&mut device, store_rc, graph_tx);
+        self.setup_targeted_volume_monitoring(&mut device, store_rc, graph_tx);
 
         self.devices.insert(global.id, device);
-        debug!(
-            "Added device {}: '{}' - requesting profiles",
-            global.id, name
-        );
+        debug!("Added device {}: '{}'", global.id, name);
         Ok(())
     }
 
-    fn setup_device_profile_monitoring(
+    fn handle_device_parameter(
+        &mut self,
+        device_id: u32,
+        param_type: ParamType,
+        pod: &Pod,
+    ) -> bool {
+        match param_type {
+            ParamType::Route => self
+                .parse_route_volume_data(device_id, pod)
+                .unwrap_or(false),
+            ParamType::Props => self
+                .parse_device_props_volume(device_id, pod)
+                .unwrap_or(false),
+            ParamType::EnumProfile => self
+                .handle_device_profile_list(device_id, pod)
+                .unwrap_or(false),
+            ParamType::Profile => self
+                .handle_device_current_profile(device_id, pod)
+                .unwrap_or(false),
+            _ => false,
+        }
+    }
+
+    pub fn setup_targeted_volume_monitoring(
         &self,
         device: &mut DeviceInternal,
         store_rc: &Rc<RefCell<Store>>,
@@ -301,53 +332,19 @@ impl Store {
             .param(move |_seq, param_type, _index, _next, pod_opt| {
                 if let Some(pod) = pod_opt {
                     if let Some(store_rc) = store_weak.upgrade() {
-                        let updated = {
-                            let mut store_borrow = match store_rc.try_borrow_mut() {
-                                Ok(s) => s,
-                                Err(e) => {
-                                    log::error!(
-                                        "Failed to borrow store in device param callback for device {}: {}",
-                                        device_id,
-                                        e
-                                    );
-                                    return;
-                                }
-                            };
-
-                            match param_type {
-                                ParamType::EnumProfile => {
-                                    match store_borrow.handle_device_profile_list(device_id, pod) {
-                                        Ok(updated) => updated,
-                                        Err(e) => {
-                                            log::error!(
-                                                "Failed to handle profile list for device {}: {}",
-                                                device_id, e
-                                            );
-                                            false
-                                        }
-                                    }
-                                }
-                                ParamType::Profile => {
-                                    match store_borrow.handle_device_current_profile(device_id, pod) {
-                                        Ok(updated) => updated,
-                                        Err(e) => {
-                                            log::error!(
-                                                "Failed to handle current profile for device {}: {}",
-                                                device_id, e
-                                            );
-                                            false
-                                        }
-                                    }
-                                }
-                                _ => false,
+                        let updated = match store_rc.try_borrow_mut() {
+                            Ok(mut store_borrow) => {
+                                store_borrow.handle_device_parameter(device_id, param_type, pod)
+                            }
+                            Err(e) => {
+                                error!("Failed to borrow store for device {}: {}", device_id, e);
+                                return;
                             }
                         };
 
                         if updated {
                             crate::pw::graph::update_graph(&store_rc, &graph_tx_clone);
                         }
-                    } else {
-                        log::warn!("Store reference expired in device param callback for device {}", device_id);
                     }
                 }
             })
@@ -355,14 +352,149 @@ impl Store {
 
         device.listener = Some(listener);
 
+        // Subscribe to volume and profile parameters
+        device.proxy.subscribe_params(&[
+            ParamType::Route,
+            ParamType::Props,
+            ParamType::EnumProfile,
+            ParamType::Profile,
+        ]);
+
+        // Initialize parameter enumeration
         device
             .proxy
-            .subscribe_params(&[ParamType::EnumProfile, ParamType::Profile]);
-
+            .enum_params(0, Some(ParamType::Route), 0, u32::MAX);
+        device
+            .proxy
+            .enum_params(0, Some(ParamType::Props), 0, u32::MAX);
         device
             .proxy
             .enum_params(0, Some(ParamType::EnumProfile), 0, u32::MAX);
         device.proxy.enum_params(0, Some(ParamType::Profile), 0, 1);
+    }
+
+    pub fn parse_route_volume_data(&mut self, device_id: u32, pod: &Pod) -> Result<bool> {
+        let device = self
+            .devices
+            .get_mut(&device_id)
+            .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
+
+        if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
+            let mut volume_updated = false;
+            let mut mute_updated = false;
+            let mut channel_volumes: Option<f32> = None;
+
+            for prop in &obj.properties {
+                match prop.key {
+                    libspa::sys::SPA_PARAM_ROUTE_props => {
+                        if let Value::Object(props_obj) = &prop.value {
+                            for volume_prop in &props_obj.properties {
+                                match volume_prop.key {
+                                    k if k == libspa::sys::SPA_PROP_channelVolumes => {
+                                        channel_volumes = VolumeResolver::extract_channel_volume(
+                                            &volume_prop.value,
+                                        );
+                                    }
+                                    k if k == libspa::sys::SPA_PROP_mute => {
+                                        if let Value::Bool(mute) = volume_prop.value {
+                                            if device.muted != mute {
+                                                device.muted = mute;
+                                                mute_updated = true;
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                    k if k == libspa::sys::SPA_PROP_mute => {
+                        if let Value::Bool(mute) = prop.value {
+                            if device.muted != mute {
+                                device.muted = mute;
+                                mute_updated = true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(ch_vol) = channel_volumes {
+                let user_facing_volume = VolumeResolver::apply_cubic_scaling(ch_vol);
+                if (device.volume - user_facing_volume).abs() > 0.001 {
+                    device.volume = user_facing_volume;
+                    volume_updated = true;
+                }
+            }
+
+            if volume_updated || mute_updated {
+                let volume = device.volume;
+                let muted = device.muted;
+                self.update_node_volumes_from_device(device_id, volume, muted);
+            }
+
+            return Ok(volume_updated || mute_updated);
+        }
+
+        Ok(false)
+    }
+
+    pub fn parse_device_props_volume(&mut self, device_id: u32, pod: &Pod) -> Result<bool> {
+        let device = self
+            .devices
+            .get_mut(&device_id)
+            .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
+
+        if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
+            let mut updated = false;
+
+            for prop in &obj.properties {
+                match prop.key {
+                    libspa::sys::SPA_PROP_volume => {
+                        if let Value::Float(volume) = prop.value {
+                            if (device.volume - volume).abs() > 0.001 {
+                                device.volume = volume;
+                                updated = true;
+                            }
+                        }
+                    }
+                    libspa::sys::SPA_PROP_mute => {
+                        if let Value::Bool(mute) = prop.value {
+                            if device.muted != mute {
+                                device.muted = mute;
+                                updated = true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            if updated {
+                let device_volume = device.volume;
+                let device_muted = device.muted;
+                self.update_node_volumes_from_device(device_id, device_volume, device_muted);
+            }
+
+            return Ok(updated);
+        }
+
+        Ok(false)
+    }
+
+    fn update_node_volumes_from_device(&mut self, device_id: u32, volume: f32, muted: bool) {
+        let device = match self.devices.get(&device_id) {
+            Some(d) => d,
+            None => return,
+        };
+
+        for &node_id in &device.nodes {
+            if let Some(node) = self.nodes.get_mut(&node_id) {
+                node.volume = volume;
+                node.muted = muted;
+            }
+        }
     }
 
     pub fn get_output_devices(&self) -> Vec<(u32, String)> {

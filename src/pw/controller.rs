@@ -6,6 +6,8 @@ use crate::pw::{
     devices::{ConnectionType, DeviceType, Profile},
     engine::PwEngine,
     nodes::{Node, NodeType},
+    volume::VolumeResolver,
+    AudioGraph,
 };
 
 pub struct Controller {
@@ -25,62 +27,76 @@ impl Controller {
     pub fn get_output_nodes(&self) -> Vec<Node> {
         let graph = self.engine.graph();
 
-        let mut nodes: Vec<Node> = graph
+        let nodes: Vec<Node> = graph
             .nodes
             .values()
             .filter(|n| {
                 matches!(n.node_type, NodeType::Sink | NodeType::Duplex)
                     && !n.name.to_lowercase().contains("monitor")
             })
-            .cloned()
+            .map(|n| self.enhance_node_volume(n, &graph))
             .collect();
 
-        nodes.sort_by(|a, b| {
-            b.is_default
-                .cmp(&a.is_default)
-                .then_with(|| {
-                    let a_connection = self.get_node_connection_type(a);
-                    let b_connection = self.get_node_connection_type(b);
-                    a_connection.cmp(&b_connection)
-                })
-                .then_with(|| {
-                    let a_name = a.description.as_ref().unwrap_or(&a.name);
-                    let b_name = b.description.as_ref().unwrap_or(&b.name);
-                    a_name.cmp(b_name)
-                })
-        });
-
-        nodes
+        self.sort_nodes_by_priority(nodes)
     }
 
     pub fn get_input_nodes(&self) -> Vec<Node> {
         let graph = self.engine.graph();
 
-        let mut nodes: Vec<Node> = graph
+        let nodes: Vec<Node> = graph
             .nodes
             .values()
             .filter(|n| {
                 matches!(n.node_type, NodeType::Source | NodeType::Duplex)
                     && !n.name.to_lowercase().contains("monitor")
             })
-            .cloned()
+            .map(|n| self.enhance_node_volume(n, &graph))
             .collect();
 
+        self.sort_nodes_by_priority(nodes)
+    }
+
+    pub fn get_node(&self, node_id: u32) -> Option<Node> {
+        let graph = self.engine.graph();
+        let node = graph.nodes.get(&node_id)?;
+        Some(self.enhance_node_volume(node, &graph))
+    }
+
+    // Extract common volume enhancement logic
+    fn enhance_node_volume(&self, node: &Node, graph: &AudioGraph) -> Node {
+        let mut enhanced_node = node.clone();
+
+        if let Some(device_id) = node.device_id {
+            if let Some(device) = graph.devices.get(&device_id) {
+                let (volume, muted) = VolumeResolver::resolve_volume(
+                    Some(device.volume),
+                    Some(device.muted),
+                    node.volume.linear,
+                    node.volume.muted,
+                );
+                enhanced_node.volume.linear = volume;
+                enhanced_node.volume.muted = muted;
+            }
+        }
+
+        enhanced_node
+    }
+
+    fn sort_nodes_by_priority(&self, mut nodes: Vec<Node>) -> Vec<Node> {
         nodes.sort_by(|a, b| {
             b.is_default
                 .cmp(&a.is_default)
                 .then_with(|| {
-                    let a_connection = self.get_node_connection_type(a);
-                    let b_connection = self.get_node_connection_type(b);
-                    a_connection.cmp(&b_connection)
+                    self.get_node_connection_type(a)
+                        .cmp(&self.get_node_connection_type(b))
                 })
                 .then_with(|| {
-                    let a_name = a.description.as_ref().unwrap_or(&a.name);
-                    let b_name = b.description.as_ref().unwrap_or(&b.name);
-                    a_name.cmp(b_name)
+                    a.description
+                        .as_ref()
+                        .unwrap_or(&a.name)
+                        .cmp(b.description.as_ref().unwrap_or(&b.name))
                 })
         });
-
         nodes
     }
 
@@ -114,10 +130,6 @@ impl Controller {
             .filter(|d| d.device_type == DeviceType::Source)
             .map(|d| (d.id, d.name.clone()))
             .collect()
-    }
-
-    pub fn get_node(&self, node_id: u32) -> Option<Node> {
-        self.engine.graph().nodes.get(&node_id).cloned()
     }
 
     pub async fn set_node_volume(&self, node_id: u32, volume: f32) -> Result<()> {

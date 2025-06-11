@@ -20,6 +20,7 @@ pub mod pw {
     pub mod metadata;
     pub mod nodes;
     pub mod restoration;
+    pub mod volume;
 
     pub use self::devices::{DeviceType, Profile};
     pub use self::engine::PwEngine;
@@ -27,4 +28,5 @@ pub mod pw {
     pub use self::links::{Link, Port, PortDirection};
     pub use self::nodes::{Node, NodeType, Volume};
     pub use self::restoration::RestorationManager;
+    pub use self::volume::VolumeResolver;
 }

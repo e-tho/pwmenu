@@ -13,7 +13,10 @@ use anyhow::{anyhow, Context as AnyhowContext, Result};
 use log::{debug, error, warn};
 use tokio::sync::watch;
 
-use crate::pw::graph::{AudioGraph, Store};
+use crate::pw::{
+    graph::{AudioGraph, Store},
+    volume::VolumeResolver,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeType {
@@ -72,6 +75,7 @@ pub struct NodeInternal {
     pub ports: Vec<u32>,
     pub proxy: pipewire::node::Node,
     pub listener: Option<pipewire::node::NodeListener>,
+    pub info_listener: Option<pipewire::node::NodeListener>,
 }
 
 impl NodeInternal {
@@ -151,6 +155,7 @@ impl Store {
             ports,
             proxy,
             listener: None,
+            info_listener: None,
         };
 
         let store_weak = Rc::downgrade(store_rc);
@@ -164,17 +169,20 @@ impl Store {
                 let graph_tx = graph_tx_clone.clone();
                 let node_id = global.id;
 
-                move |_seq, _type, _index, _next, pod_opt: Option<&pipewire::spa::pod::Pod>| {
+                move |_seq,
+                      _param_type,
+                      _index,
+                      _next,
+                      pod_opt: Option<&pipewire::spa::pod::Pod>| {
                     if let Some(actual_pod) = pod_opt {
                         if let Some(upgraded_store_rc) = store_weak.upgrade() {
                             let updated = {
                                 let mut store_borrow = match upgraded_store_rc.try_borrow_mut() {
                                     Ok(s) => s,
                                     Err(e) => {
-                                        log::error!(
-                                            "Borrow store failed in node param cb {}: {}",
-                                            node_id,
-                                            e
+                                        error!(
+                                            "Failed to borrow store in node param cb {}: {}",
+                                            node_id, e
                                         );
                                         return;
                                     }
@@ -184,8 +192,58 @@ impl Store {
                             if updated {
                                 crate::pw::graph::update_graph(&upgraded_store_rc, &graph_tx);
                             }
-                        } else {
-                            log::warn!("Store expired in node param cb for {}", node_id);
+                        }
+                    }
+                }
+            })
+            .register();
+
+        let info_listener = node
+            .proxy
+            .add_listener_local()
+            .info({
+                let store_weak = store_weak.clone();
+                let graph_tx = graph_tx_clone.clone();
+                let node_id = global.id;
+
+                move |_info| {
+                    if let Some(store_rc) = store_weak.upgrade() {
+                        let updated = {
+                            let store_borrow = match store_rc.try_borrow() {
+                                Ok(s) => s,
+                                Err(_) => return,
+                            };
+
+                            // Trigger device Route re-enumeration for external changes
+                            if let Some(node_internal) = store_borrow.nodes.get(&node_id) {
+                                if let Some(device_id) = node_internal.device_id {
+                                    if let Some(device) = store_borrow.devices.get(&device_id) {
+                                        device.proxy.enum_params(
+                                            0,
+                                            Some(ParamType::Route),
+                                            0,
+                                            u32::MAX,
+                                        );
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    node_internal.proxy.enum_params(
+                                        0,
+                                        Some(ParamType::Props),
+                                        0,
+                                        1,
+                                    );
+                                    true
+                                }
+                            } else {
+                                false
+                            }
+                        };
+
+                        if updated {
+                            crate::pw::graph::update_graph(&store_rc, &graph_tx);
                         }
                     }
                 }
@@ -193,6 +251,7 @@ impl Store {
             .register();
 
         node.listener = Some(listener);
+        node.info_listener = Some(info_listener);
 
         node.proxy
             .enum_params(0, Some(pipewire::spa::param::ParamType::Props), 0, u32::MAX);
@@ -214,47 +273,47 @@ impl Store {
 
     pub fn update_node_param(&mut self, node_id: u32, pod: &Pod) -> bool {
         let Some(node) = self.nodes.get_mut(&node_id) else {
-            error!("Node {} not found for param update", node_id);
             return false;
         };
 
         let mut updated = false;
-        if let Ok(value_tuple) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
-            if let (_, Value::Object(obj)) = value_tuple {
-                for prop in &obj.properties {
-                    match prop.key {
-                        libspa::sys::SPA_PROP_volume => {
-                            if let Value::Float(volume) = prop.value {
-                                if node.volume.ne(&volume) {
-                                    node.volume = volume;
-                                    debug!("Node {} volume updated to {}", node_id, volume);
-                                    updated = true;
-                                }
+        if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
+            for prop in &obj.properties {
+                match prop.key {
+                    libspa::sys::SPA_PROP_volume => {
+                        if let Value::Float(volume) = prop.value {
+                            if (node.volume - volume).abs() > 0.001 {
+                                node.volume = volume;
+                                updated = true;
                             }
                         }
-                        libspa::sys::SPA_PROP_mute => {
-                            if let Value::Bool(mute) = prop.value {
-                                if node.muted != mute {
-                                    node.muted = mute;
-                                    debug!("Node {} mute updated to {}", node_id, mute);
-                                    updated = true;
-                                }
-                            }
-                        }
-                        _ => {}
                     }
+                    libspa::sys::SPA_PROP_mute => {
+                        if let Value::Bool(mute) = prop.value {
+                            if node.muted != mute {
+                                node.muted = mute;
+                                updated = true;
+                            }
+                        }
+                    }
+                    libspa::sys::SPA_PROP_channelVolumes => {
+                        if let Some(raw_volume) =
+                            VolumeResolver::extract_channel_volume(&prop.value)
+                        {
+                            let scaled_volume = VolumeResolver::apply_cubic_scaling(raw_volume);
+                            if (node.volume - scaled_volume).abs() > 0.001 {
+                                node.volume = scaled_volume;
+                                updated = true;
+                            }
+                        }
+                    }
+                    _ => {}
                 }
-            } else {
-                warn!(
-                    "Param pod for node {} was not an object: {:?}",
-                    node_id, value_tuple
-                );
             }
-        } else {
-            error!("Failed to deserialize param pod for node {}", node_id);
         }
         updated
     }
+
     pub fn set_node_volume(&mut self, node_id: u32, volume: f32) -> Result<()> {
         let node = self
             .nodes
