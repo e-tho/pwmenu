@@ -10,7 +10,10 @@ use crate::{
 use anyhow::Result;
 use rust_i18n::t;
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::{
+    sync::mpsc::UnboundedSender,
+    time::{sleep, Duration},
+};
 
 const VOLUME_STEP: f32 = 0.05; // 5% volume change per step
 
@@ -312,6 +315,29 @@ impl App {
         icon_type: &str,
         spaces: usize,
     ) -> Result<()> {
+        let mut stay_in_profile_menu = true;
+
+        while stay_in_profile_menu {
+            let should_stay = self
+                .handle_profile_options(menu, menu_command, device_id, icon_type, spaces)
+                .await?;
+
+            if !should_stay {
+                stay_in_profile_menu = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_profile_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        device_id: u32,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<bool> {
         let profiles = self.controller.get_device_profiles(device_id);
         let current_profile = self.controller.get_device_current_profile(device_id);
 
@@ -329,8 +355,36 @@ impl App {
             .await?;
 
         if let Some(ProfileMenuOptions::SelectProfile(profile_index)) = option {
+            let target_profile = profile_index;
+
             self.perform_profile_switch(device_id, profile_index, &device_name, &profiles)
                 .await?;
+
+            self.wait_for_profile_change(device_id, target_profile)
+                .await?;
+
+            Ok(true)
+        } else {
+            try_send_log!(
+                self.log_sender,
+                format!("Exited profile menu for {}", device_name)
+            );
+            Ok(false)
+        }
+    }
+
+    async fn wait_for_profile_change(
+        &self,
+        device_id: u32,
+        target_profile_index: u32,
+    ) -> Result<()> {
+        for _ in 0..20 {
+            if let Some(current_profile) = self.controller.get_device_current_profile(device_id) {
+                if current_profile.index == target_profile_index {
+                    return Ok(());
+                }
+            }
+            sleep(Duration::from_millis(50)).await;
         }
 
         Ok(())
