@@ -201,12 +201,48 @@ impl App {
             .cloned();
 
         if let Some(node) = node_clone {
-            self.handle_device_options(menu, menu_command, &node, icon_type, spaces, is_output)
+            self.handle_device_menu(menu, menu_command, &node, icon_type, spaces, is_output)
                 .await?;
             return Ok(Some(node));
         }
 
         Ok(None)
+    }
+
+    async fn handle_device_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        node: &Node,
+        icon_type: &str,
+        spaces: usize,
+        is_output: bool,
+    ) -> Result<()> {
+        let mut stay_in_device_menu = true;
+        let mut current_node = node.clone();
+
+        while stay_in_device_menu {
+            if let Some(updated_node) = self.controller.get_node(current_node.id) {
+                current_node = updated_node;
+            }
+
+            let should_stay = self
+                .handle_device_options(
+                    menu,
+                    menu_command,
+                    &current_node,
+                    icon_type,
+                    spaces,
+                    is_output,
+                )
+                .await?;
+
+            if !should_stay {
+                stay_in_device_menu = false;
+            }
+        }
+
+        Ok(())
     }
 
     async fn handle_device_options(
@@ -217,7 +253,7 @@ impl App {
         icon_type: &str,
         spaces: usize,
         is_output: bool,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let has_profiles = if let Some(device_id) = node.device_id {
             let profiles = self.controller.get_device_profiles(device_id);
             profiles.len() > 1
@@ -241,21 +277,31 @@ impl App {
             match option {
                 DeviceMenuOptions::SetDefault => {
                     self.perform_set_default(node, is_output).await?;
+                    Ok(true)
                 }
                 DeviceMenuOptions::SwitchProfile => {
                     if let Some(device_id) = node.device_id {
                         self.handle_profile_menu(menu, menu_command, device_id, icon_type, spaces)
                             .await?;
                     }
+                    Ok(true)
                 }
                 DeviceMenuOptions::AdjustVolume => {
                     self.handle_volume_menu(menu, menu_command, node, icon_type, spaces, is_output)
                         .await?;
+                    Ok(true)
                 }
             }
+        } else {
+            try_send_log!(
+                self.log_sender,
+                format!(
+                    "Exited device menu for {}",
+                    node.description.as_ref().unwrap_or(&node.name)
+                )
+            );
+            Ok(false)
         }
-
-        Ok(())
     }
 
     async fn handle_profile_menu(
