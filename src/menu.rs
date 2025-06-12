@@ -473,6 +473,7 @@ impl Menu {
         spaces: usize,
         node: &Node,
         is_output_menu: bool,
+        last_action: Option<VolumeMenuOptions>,
     ) -> Result<Option<VolumeMenuOptions>> {
         let mut options = Vec::new();
 
@@ -487,8 +488,20 @@ impl Menu {
             "input_volume_down"
         };
 
-        options.push((increase_key, VolumeMenuOptions::Increase.to_str()));
-        options.push((decrease_key, VolumeMenuOptions::Decrease.to_str()));
+        match last_action {
+            Some(VolumeMenuOptions::Decrease) => {
+                options.push((decrease_key, VolumeMenuOptions::Decrease.to_str()));
+                options.push((increase_key, VolumeMenuOptions::Increase.to_str()));
+            }
+            Some(VolumeMenuOptions::Increase) => {
+                options.push((increase_key, VolumeMenuOptions::Increase.to_str()));
+                options.push((decrease_key, VolumeMenuOptions::Decrease.to_str()));
+            }
+            _ => {
+                options.push((increase_key, VolumeMenuOptions::Increase.to_str()));
+                options.push((decrease_key, VolumeMenuOptions::Decrease.to_str()));
+            }
+        }
 
         if node.volume.muted {
             let unmute_key = if is_output_menu {

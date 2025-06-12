@@ -401,13 +401,14 @@ impl App {
     ) -> Result<()> {
         let mut stay_in_volume_menu = true;
         let mut current_node = node.clone();
+        let mut last_action: Option<VolumeMenuOptions> = None;
 
         while stay_in_volume_menu {
             if let Some(updated_node) = self.controller.get_node(current_node.id) {
                 current_node = updated_node;
             }
 
-            let should_stay = self
+            let (should_stay, selected_action) = self
                 .handle_volume_options(
                     menu,
                     menu_command,
@@ -415,8 +416,11 @@ impl App {
                     icon_type,
                     spaces,
                     is_output,
+                    last_action,
                 )
                 .await?;
+
+            last_action = selected_action;
 
             if !should_stay {
                 stay_in_volume_menu = false;
@@ -426,6 +430,7 @@ impl App {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn handle_volume_options(
         &mut self,
         menu: &Menu,
@@ -434,30 +439,35 @@ impl App {
         icon_type: &str,
         spaces: usize,
         is_output: bool,
-    ) -> Result<bool> {
+        last_action: Option<VolumeMenuOptions>,
+    ) -> Result<(bool, Option<VolumeMenuOptions>)> {
         let option = menu
-            .show_volume_menu(menu_command, icon_type, spaces, node, is_output)
+            .show_volume_menu(
+                menu_command,
+                icon_type,
+                spaces,
+                node,
+                is_output,
+                last_action,
+            )
             .await?;
 
-        if let Some(option) = option {
-            match option {
+        if let Some(selected_option) = option {
+            match selected_option {
                 VolumeMenuOptions::Increase => {
                     self.perform_volume_change(node, VOLUME_STEP).await?;
-                    Ok(true)
                 }
                 VolumeMenuOptions::Decrease => {
                     self.perform_volume_change(node, -VOLUME_STEP).await?;
-                    Ok(true)
                 }
                 VolumeMenuOptions::Mute => {
                     self.perform_mute_toggle(node, true).await?;
-                    Ok(true)
                 }
                 VolumeMenuOptions::Unmute => {
                     self.perform_mute_toggle(node, false).await?;
-                    Ok(true)
                 }
             }
+            Ok((true, Some(selected_option)))
         } else {
             try_send_log!(
                 self.log_sender,
@@ -466,7 +476,7 @@ impl App {
                     node.description.as_ref().unwrap_or(&node.name)
                 )
             );
-            Ok(false)
+            Ok((false, None))
         }
     }
 
