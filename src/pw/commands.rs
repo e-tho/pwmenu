@@ -41,5 +41,15 @@ pub enum PwCommand {
         profile_index: u32,
         result_sender: oneshot::Sender<Result<()>>,
     },
+    SetDeviceVolume {
+        device_id: u32,
+        volume: f32,
+        result_sender: oneshot::Sender<Result<()>>,
+    },
+    SetDeviceMute {
+        device_id: u32,
+        mute: bool,
+        result_sender: oneshot::Sender<Result<()>>,
+    },
     Exit,
 }

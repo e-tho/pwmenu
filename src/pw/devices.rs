@@ -130,6 +130,10 @@ pub struct DeviceInternal {
     pub listener: Option<pipewire::device::DeviceListener>,
     pub volume: f32,
     pub muted: bool,
+    pub output_route_index: Option<i32>,
+    pub output_route_device: Option<i32>,
+    pub input_route_index: Option<i32>,
+    pub input_route_device: Option<i32>,
 }
 
 impl DeviceInternal {
@@ -284,6 +288,10 @@ impl Store {
             listener: None,
             volume: 1.0,
             muted: false,
+            output_route_index: None,
+            output_route_device: None,
+            input_route_index: None,
+            input_route_device: None,
         };
 
         self.setup_targeted_volume_monitoring(&mut device, store_rc, graph_tx);
@@ -381,12 +389,40 @@ impl Store {
 
         if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
             let mut route_direction: Option<u32> = None;
+            let mut route_index: Option<i32> = None;
+            let mut route_device: Option<i32> = None;
+
             for prop in &obj.properties {
-                if prop.key == libspa::sys::SPA_PARAM_ROUTE_direction {
-                    if let Value::Id(spa_id) = &prop.value {
-                        route_direction = Some(spa_id.0);
-                        break;
+                match prop.key {
+                    libspa::sys::SPA_PARAM_ROUTE_direction => {
+                        if let Value::Id(spa_id) = &prop.value {
+                            route_direction = Some(spa_id.0);
+                        }
                     }
+                    libspa::sys::SPA_PARAM_ROUTE_index => {
+                        if let Value::Int(index) = prop.value {
+                            route_index = Some(index);
+                        }
+                    }
+                    libspa::sys::SPA_PARAM_ROUTE_device => {
+                        if let Value::Int(device_num) = prop.value {
+                            route_device = Some(device_num);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Cache route info for all routes
+            if let (Some(direction), Some(index), Some(device_num)) =
+                (route_direction, route_index, route_device)
+            {
+                if direction == 1 {
+                    device.output_route_index = Some(index);
+                    device.output_route_device = Some(device_num);
+                } else if direction == 0 {
+                    device.input_route_index = Some(index);
+                    device.input_route_device = Some(device_num);
                 }
             }
 
@@ -704,5 +740,165 @@ impl Store {
             .ok_or_else(|| anyhow!("Device {} not found for profile switch", device_id))?;
 
         device.switch_profile(profile_index)
+    }
+
+    fn determine_effective_device_type(&self, device: &DeviceInternal) -> Result<DeviceType> {
+        if device.device_type != DeviceType::Unknown {
+            return Ok(device.device_type);
+        }
+
+        let node_types: Vec<_> = device
+            .nodes
+            .iter()
+            .filter_map(|&node_id| self.nodes.get(&node_id))
+            .map(|node| node.node_type)
+            .collect();
+
+        if node_types
+            .iter()
+            .any(|&nt| matches!(nt, crate::pw::nodes::NodeType::Sink))
+        {
+            Ok(DeviceType::Sink)
+        } else if node_types
+            .iter()
+            .any(|&nt| matches!(nt, crate::pw::nodes::NodeType::Source))
+        {
+            Ok(DeviceType::Source)
+        } else {
+            Err(anyhow!(
+                "Cannot determine device type for device {}",
+                device.id
+            ))
+        }
+    }
+
+    fn get_route_info(
+        &self,
+        device: &DeviceInternal,
+        device_type: DeviceType,
+    ) -> Result<(i32, i32)> {
+        match device_type {
+            DeviceType::Sink => device
+                .output_route_index
+                .zip(device.output_route_device)
+                .ok_or_else(|| anyhow!("No cached output route info for device {}", device.id)),
+            DeviceType::Source => device
+                .input_route_index
+                .zip(device.input_route_device)
+                .ok_or_else(|| anyhow!("No cached input route info for device {}", device.id)),
+            DeviceType::Unknown => Err(anyhow!("Cannot get route info for Unknown device type")),
+        }
+    }
+
+    fn build_route_parameter_pod(
+        &self,
+        route_index: i32,
+        route_device: i32,
+        props_builder: impl FnOnce(&mut Builder) -> Result<()>,
+    ) -> Result<Vec<u8>> {
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut builder = Builder::new(&mut buffer);
+        let mut frame = MaybeUninit::<spa_pod_frame>::uninit();
+
+        unsafe {
+            builder
+                .push_object(
+                    &mut frame,
+                    libspa::sys::SPA_TYPE_OBJECT_ParamRoute,
+                    ParamType::Route.as_raw(),
+                )
+                .context("Failed to push Route object")?;
+            let initialized_frame = frame.assume_init_mut();
+
+            builder
+                .add_prop(libspa::sys::SPA_PARAM_ROUTE_index, 0)
+                .and_then(|_| builder.add_int(route_index))
+                .and_then(|_| builder.add_prop(libspa::sys::SPA_PARAM_ROUTE_device, 0))
+                .and_then(|_| builder.add_int(route_device))
+                .and_then(|_| builder.add_prop(libspa::sys::SPA_PARAM_ROUTE_props, 0))
+                .context("Failed to add route identification")?;
+
+            let mut props_frame = MaybeUninit::<spa_pod_frame>::uninit();
+            builder
+                .push_object(
+                    &mut props_frame,
+                    libspa::sys::SPA_TYPE_OBJECT_Props,
+                    libspa::sys::SPA_TYPE_OBJECT_Props,
+                )
+                .context("Failed to push props object")?;
+            let initialized_props_frame = props_frame.assume_init_mut();
+
+            props_builder(&mut builder)?;
+
+            builder.pop(initialized_props_frame);
+
+            builder
+                .add_prop(libspa::sys::SPA_PARAM_ROUTE_save, 0)
+                .and_then(|_| builder.add_bool(true))
+                .context("Failed to add route save")?;
+
+            builder.pop(initialized_frame);
+        }
+
+        Ok(buffer)
+    }
+
+    pub fn set_device_volume(&mut self, device_id: u32, volume: f32) -> Result<()> {
+        let device = self
+            .devices
+            .get(&device_id)
+            .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
+
+        let effective_device_type = self.determine_effective_device_type(device)?;
+        let (route_index, route_device) = self.get_route_info(device, effective_device_type)?;
+
+        let raw_volume = VolumeResolver::apply_inverse_cubic_scaling(volume.clamp(0.0, 1.0));
+
+        let buffer = self.build_route_parameter_pod(route_index, route_device, |builder| {
+            builder
+                .add_prop(libspa::sys::SPA_PROP_channelVolumes, 0)
+                .context("Failed to add channelVolumes property")?;
+
+            let volumes = [raw_volume; 2];
+            unsafe {
+                builder
+                    .add_array(
+                        std::mem::size_of::<f32>() as u32,
+                        pipewire::spa::utils::SpaTypes::Float.as_raw(),
+                        volumes.len() as u32,
+                        volumes.as_ptr() as *const std::ffi::c_void,
+                    )
+                    .context("Failed to add volume array")
+            }
+        })?;
+
+        let pod_ref = Pod::from_bytes(&buffer)
+            .ok_or_else(|| anyhow!("Failed to create Pod reference for device volume"))?;
+
+        device.proxy.set_param(ParamType::Route, 0, pod_ref);
+        Ok(())
+    }
+
+    pub fn set_device_mute(&mut self, device_id: u32, mute: bool) -> Result<()> {
+        let device = self
+            .devices
+            .get(&device_id)
+            .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
+
+        let effective_device_type = self.determine_effective_device_type(device)?;
+        let (route_index, route_device) = self.get_route_info(device, effective_device_type)?;
+
+        let buffer = self.build_route_parameter_pod(route_index, route_device, |builder| {
+            builder
+                .add_prop(libspa::sys::SPA_PROP_mute, 0)
+                .and_then(|_| builder.add_bool(mute))
+                .context("Failed to add mute property")
+        })?;
+
+        let pod_ref = Pod::from_bytes(&buffer)
+            .ok_or_else(|| anyhow!("Failed to create Pod reference for device mute"))?;
+
+        device.proxy.set_param(ParamType::Route, 0, pod_ref);
+        Ok(())
     }
 }

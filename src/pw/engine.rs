@@ -134,6 +134,24 @@ impl PwEngine {
         })
         .await
     }
+
+    pub async fn set_device_volume(&self, device_id: u32, volume: f32) -> Result<()> {
+        self.send_command_and_wait(|rs| PwCommand::SetDeviceVolume {
+            device_id,
+            volume,
+            result_sender: rs,
+        })
+        .await
+    }
+
+    pub async fn set_device_mute(&self, device_id: u32, mute: bool) -> Result<()> {
+        self.send_command_and_wait(|rs| PwCommand::SetDeviceMute {
+            device_id,
+            mute,
+            result_sender: rs,
+        })
+        .await
+    }
 }
 
 impl Drop for PwEngine {
@@ -366,6 +384,18 @@ fn run_pipewire_loop(
                             .borrow_mut()
                             .switch_device_profile_with_restoration(device_id, profile_index),
                     ),
+                    PwCommand::SetDeviceVolume {
+                        device_id,
+                        volume,
+                        result_sender,
+                    } => {
+                        result_sender.send(store.borrow_mut().set_device_volume(device_id, volume))
+                    }
+                    PwCommand::SetDeviceMute {
+                        device_id,
+                        mute,
+                        result_sender,
+                    } => result_sender.send(store.borrow_mut().set_device_mute(device_id, mute)),
                     PwCommand::Exit => unreachable!("Exit handled above"),
                 };
 

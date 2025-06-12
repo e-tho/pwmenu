@@ -26,6 +26,14 @@ impl VolumeResolver {
         }
     }
 
+    pub fn apply_inverse_cubic_scaling(volume: f32) -> f32 {
+        if volume <= 0.0 {
+            0.0
+        } else {
+            volume.powf(3.0)
+        }
+    }
+
     pub fn extract_channel_volume(value: &Value) -> Option<f32> {
         match value {
             Value::ValueArray(ValueArray::Float(float_vec)) => {

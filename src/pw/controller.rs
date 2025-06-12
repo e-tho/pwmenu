@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -132,35 +132,71 @@ impl Controller {
             .collect()
     }
 
-    pub async fn set_node_volume(&self, node_id: u32, volume: f32) -> Result<()> {
-        let result = self.engine.set_node_volume(node_id, volume).await;
+    pub async fn set_volume(&self, node_id: u32, volume: f32) -> Result<()> {
+        let graph = self.engine.graph();
+        let node = graph
+            .nodes
+            .get(&node_id)
+            .ok_or_else(|| anyhow!("Node {} not found", node_id))?;
+
+        // Try device-level control first, fall back to node-level
+        let result = if let Some(device_id) = node.device_id {
+            if graph.devices.contains_key(&device_id) {
+                match self.engine.set_device_volume(device_id, volume).await {
+                    Ok(()) => Ok(()),
+                    Err(_) => self.engine.set_node_volume(node_id, volume).await,
+                }
+            } else {
+                self.engine.set_node_volume(node_id, volume).await
+            }
+        } else {
+            self.engine.set_node_volume(node_id, volume).await
+        };
 
         if result.is_ok() {
-            if let Some(node) = self.get_node(node_id) {
-                try_send_log!(
-                    self.log_sender,
-                    format!(
-                        "Set volume for {} to {}%",
-                        node.name,
-                        (volume * 100.0) as u32
-                    )
-                );
-            }
+            try_send_log!(
+                self.log_sender,
+                format!(
+                    "Set volume for {} to {}%",
+                    node.description.as_ref().unwrap_or(&node.name),
+                    (volume * 100.0) as u32
+                )
+            );
         }
 
         result
     }
 
-    pub async fn set_node_mute(&self, node_id: u32, mute: bool) -> Result<()> {
-        let result = self.engine.set_node_mute(node_id, mute).await;
+    pub async fn set_mute(&self, node_id: u32, mute: bool) -> Result<()> {
+        let graph = self.engine.graph();
+        let node = graph
+            .nodes
+            .get(&node_id)
+            .ok_or_else(|| anyhow!("Node {} not found", node_id))?;
+
+        // Try device-level control first, fall back to node-level
+        let result = if let Some(device_id) = node.device_id {
+            if graph.devices.contains_key(&device_id) {
+                match self.engine.set_device_mute(device_id, mute).await {
+                    Ok(()) => Ok(()),
+                    Err(_) => self.engine.set_node_mute(node_id, mute).await,
+                }
+            } else {
+                self.engine.set_node_mute(node_id, mute).await
+            }
+        } else {
+            self.engine.set_node_mute(node_id, mute).await
+        };
 
         if result.is_ok() {
-            if let Some(node) = self.get_node(node_id) {
-                try_send_log!(
-                    self.log_sender,
-                    format!("{} {}", if mute { "Muted" } else { "Unmuted" }, node.name)
-                );
-            }
+            try_send_log!(
+                self.log_sender,
+                format!(
+                    "{} {}",
+                    if mute { "Muted" } else { "Unmuted" },
+                    node.description.as_ref().unwrap_or(&node.name)
+                )
+            );
         }
 
         result

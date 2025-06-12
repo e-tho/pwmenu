@@ -385,35 +385,30 @@ impl App {
         let current = node.volume.linear;
         let new_volume = (current + delta).clamp(0.0, 1.0);
 
-        self.controller.set_node_volume(node.id, new_volume).await?;
+        self.controller.set_volume(node.id, new_volume).await?;
 
-        if let Some(updated_node) = self.controller.get_node(node.id) {
-            let volume_percent = updated_node.volume.percent();
-            let display_name = updated_node
-                .description
-                .as_ref()
-                .unwrap_or(&updated_node.name);
+        let volume_percent = (new_volume * 100.0).round() as u8;
+        let display_name = node.description.as_ref().unwrap_or(&node.name);
 
-            let msg = t!(
-                "notifications.pw.volume_changed",
-                device_name = display_name,
-                volume = volume_percent
-            );
+        let msg = t!(
+            "notifications.pw.volume_changed",
+            device_name = display_name,
+            volume = volume_percent
+        );
 
-            try_send_log!(self.log_sender, msg.to_string());
-            self.notification_manager.send_volume_notification(
-                display_name,
-                volume_percent,
-                updated_node.volume.muted,
-                &updated_node.node_type,
-            )?;
-        }
+        try_send_log!(self.log_sender, msg.to_string());
+        self.notification_manager.send_volume_notification(
+            display_name,
+            volume_percent,
+            node.volume.muted,
+            &node.node_type,
+        )?;
 
         Ok(())
     }
 
     async fn perform_mute_toggle(&self, node: &Node, mute: bool) -> Result<()> {
-        self.controller.set_node_mute(node.id, mute).await?;
+        self.controller.set_mute(node.id, mute).await?;
 
         let display_name = node.description.as_ref().unwrap_or(&node.name);
         let msg = if mute {
