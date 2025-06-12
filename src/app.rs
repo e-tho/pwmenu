@@ -345,6 +345,42 @@ impl App {
         spaces: usize,
         is_output: bool,
     ) -> Result<()> {
+        let mut stay_in_volume_menu = true;
+        let mut current_node = node.clone();
+
+        while stay_in_volume_menu {
+            if let Some(updated_node) = self.controller.get_node(current_node.id) {
+                current_node = updated_node;
+            }
+
+            let should_stay = self
+                .handle_volume_options(
+                    menu,
+                    menu_command,
+                    &current_node,
+                    icon_type,
+                    spaces,
+                    is_output,
+                )
+                .await?;
+
+            if !should_stay {
+                stay_in_volume_menu = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_volume_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        node: &Node,
+        icon_type: &str,
+        spaces: usize,
+        is_output: bool,
+    ) -> Result<bool> {
         let option = menu
             .show_volume_menu(menu_command, icon_type, spaces, node, is_output)
             .await?;
@@ -353,20 +389,31 @@ impl App {
             match option {
                 VolumeMenuOptions::Increase => {
                     self.perform_volume_change(node, VOLUME_STEP).await?;
+                    Ok(true)
                 }
                 VolumeMenuOptions::Decrease => {
                     self.perform_volume_change(node, -VOLUME_STEP).await?;
+                    Ok(true)
                 }
                 VolumeMenuOptions::Mute => {
                     self.perform_mute_toggle(node, true).await?;
+                    Ok(true)
                 }
                 VolumeMenuOptions::Unmute => {
                     self.perform_mute_toggle(node, false).await?;
+                    Ok(true)
                 }
             }
+        } else {
+            try_send_log!(
+                self.log_sender,
+                format!(
+                    "Exited volume menu for {}",
+                    node.description.as_ref().unwrap_or(&node.name)
+                )
+            );
+            Ok(false)
         }
-
-        Ok(())
     }
 
     fn get_display_name(node: &Node) -> &str {
