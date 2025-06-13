@@ -81,6 +81,30 @@ impl App {
         Ok(None)
     }
 
+    pub async fn run_output_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<Option<String>> {
+        self.handle_output_menu(menu, menu_command, icon_type, spaces)
+            .await?;
+        Ok(None)
+    }
+
+    pub async fn run_input_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<Option<String>> {
+        self.handle_input_menu(menu, menu_command, icon_type, spaces)
+            .await?;
+        Ok(None)
+    }
+
     async fn handle_main_options(
         &mut self,
         menu: &Menu,

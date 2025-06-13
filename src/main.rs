@@ -58,6 +58,14 @@ async fn main() -> Result<()> {
                 .default_value("1")
                 .help("Number of spaces between icon and text when using font icons"),
         )
+        .arg(
+            Arg::new("menu")
+                .short('m')
+                .long("menu")
+                .takes_value(true)
+                .possible_values(["outputs", "inputs"])
+                .help("Start in the specified root menu"),
+        )
         .get_matches();
 
     let launcher_type: LauncherType = matches
@@ -68,6 +76,8 @@ async fn main() -> Result<()> {
     let command_str = matches.get_one::<String>("launcher_command").cloned();
 
     let icon_type = matches.get_one::<String>("icon").cloned().unwrap();
+
+    let root_menu = matches.get_one::<String>("menu").cloned();
 
     let icons = Arc::new(Icons::new());
     let menu = Menu::new(launcher_type, icons.clone());
@@ -85,7 +95,16 @@ async fn main() -> Result<()> {
         }
     });
 
-    run_app_loop(&menu, &command_str, &icon_type, spaces, log_sender, icons).await?;
+    run_app_loop(
+        &menu,
+        &command_str,
+        &icon_type,
+        spaces,
+        log_sender,
+        icons,
+        root_menu,
+    )
+    .await?;
 
     Ok(())
 }
@@ -97,11 +116,28 @@ async fn run_app_loop(
     spaces: usize,
     log_sender: tokio::sync::mpsc::UnboundedSender<String>,
     icons: Arc<Icons>,
+    root_menu: Option<String>,
 ) -> Result<()> {
     let mut app = App::new(menu.clone(), log_sender.clone(), icons.clone()).await?;
 
     loop {
-        match app.run(menu, command_str, icon_type, spaces).await {
+        let result = if let Some(ref menu_name) = root_menu {
+            match menu_name.as_str() {
+                "outputs" => {
+                    app.run_output_menu(menu, command_str, icon_type, spaces)
+                        .await
+                }
+                "inputs" => {
+                    app.run_input_menu(menu, command_str, icon_type, spaces)
+                        .await
+                }
+                _ => Err(anyhow!("Invalid menu value: {}", menu_name)),
+            }
+        } else {
+            app.run(menu, command_str, icon_type, spaces).await
+        };
+
+        match result {
             Ok(_) => {
                 if !app.reset_mode {
                     break;
