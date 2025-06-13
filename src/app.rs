@@ -49,6 +49,10 @@ impl App {
         self.running = false;
     }
 
+    pub async fn wait_for_initialization(&self) -> Result<()> {
+        self.controller.wait_for_initialization().await
+    }
+
     pub async fn run(
         &mut self,
         menu: &Menu,

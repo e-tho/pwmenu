@@ -122,6 +122,7 @@ async fn run_app_loop(
 
     loop {
         let result = if let Some(ref menu_name) = root_menu {
+            app.wait_for_initialization().await?;
             match menu_name.as_str() {
                 "outputs" => {
                     app.run_output_menu(menu, command_str, icon_type, spaces)

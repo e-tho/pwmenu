@@ -24,6 +24,10 @@ impl Controller {
         Ok(Self { engine, log_sender })
     }
 
+    pub async fn wait_for_initialization(&self) -> Result<()> {
+        self.engine.wait_for_initialization().await
+    }
+
     pub fn get_output_nodes(&self) -> Vec<Node> {
         let graph = self.engine.graph();
 

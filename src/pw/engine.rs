@@ -10,6 +10,7 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::pw::{
     commands::PwCommand,
     graph::{update_graph, AudioGraph, ConnectionStatus, Store},
+    nodes::NodeType,
 };
 
 pub struct PwEngine {
@@ -37,6 +38,38 @@ impl PwEngine {
             graph_rx,
             _join_handle: Some(join_handle),
         })
+    }
+
+    pub async fn wait_for_initialization(&self) -> Result<()> {
+        let mut graph_rx = self.graph_rx.clone();
+
+        loop {
+            let graph = graph_rx.borrow().clone();
+            let devices_with_nodes = graph
+                .devices
+                .values()
+                .filter(|d| !d.nodes.is_empty())
+                .count();
+            let audio_nodes = graph
+                .nodes
+                .values()
+                .filter(|n| matches!(n.node_type, NodeType::Sink | NodeType::Source))
+                .count();
+
+            if graph.connection_status == crate::pw::ConnectionStatus::Connected
+                && !graph.devices.is_empty()
+                && devices_with_nodes == graph.devices.len()
+                && audio_nodes > 0
+            {
+                break;
+            }
+
+            if graph_rx.changed().await.is_err() {
+                return Err(anyhow!("Graph updates channel closed"));
+            }
+        }
+
+        Ok(())
     }
 
     pub fn graph(&self) -> AudioGraph {
