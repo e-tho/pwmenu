@@ -32,33 +32,14 @@ async fn main() -> Result<()> {
                 .required(true)
                 .takes_value(true)
                 .value_parser(EnumValueParser::<LauncherType>::new())
-                .conflicts_with("menu")
-                .help("Launcher to use (replaces deprecated --menu)"),
-        )
-        .arg(
-            Arg::new("menu") // Deprecated
-                .short('m')
-                .long("menu")
-                .takes_value(true)
-                .value_parser(EnumValueParser::<LauncherType>::new())
-                .hide(true)
-                .help("DEPRECATED: use --launcher instead"),
+                .help("Launcher to use"),
         )
         .arg(
             Arg::new("launcher_command")
                 .long("launcher-command")
                 .takes_value(true)
                 .required_if_eq("launcher", "custom")
-                .conflicts_with("menu_command")
                 .help("Launcher command to use when --launcher is set to custom"),
-        )
-        .arg(
-            Arg::new("menu_command") // Deprecated
-                .long("menu-command")
-                .takes_value(true)
-                .required_if_eq("menu", "custom")
-                .hide(true)
-                .help("DEPRECATED: use --launcher-command instead"),
         )
         .arg(
             Arg::new("icon")
@@ -79,28 +60,12 @@ async fn main() -> Result<()> {
         )
         .get_matches();
 
-    let launcher_type: LauncherType = if matches.contains_id("launcher") {
-        matches
-            .get_one::<LauncherType>("launcher")
-            .cloned()
-            .unwrap()
-    } else if matches.contains_id("menu") {
-        eprintln!("WARNING: --menu flag is deprecated. Please use --launcher instead.");
-        matches.get_one::<LauncherType>("menu").cloned().unwrap()
-    } else {
-        LauncherType::Dmenu
-    };
+    let launcher_type: LauncherType = matches
+        .get_one::<LauncherType>("launcher")
+        .cloned()
+        .unwrap();
 
-    let command_str = if matches.contains_id("launcher_command") {
-        matches.get_one::<String>("launcher_command").cloned()
-    } else if matches.contains_id("menu_command") {
-        eprintln!(
-            "WARNING: --menu-command flag is deprecated. Please use --launcher-command instead."
-        );
-        matches.get_one::<String>("menu_command").cloned()
-    } else {
-        None
-    };
+    let command_str = matches.get_one::<String>("launcher_command").cloned();
 
     let icon_type = matches.get_one::<String>("icon").cloned().unwrap();
 
