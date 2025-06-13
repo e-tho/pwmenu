@@ -109,6 +109,28 @@ impl App {
         icon_type: &str,
         spaces: usize,
     ) -> Result<()> {
+        let mut stay_in_output_menu = true;
+
+        while stay_in_output_menu {
+            let should_stay = self
+                .handle_output_options(menu, menu_command, icon_type, spaces)
+                .await?;
+
+            if !should_stay {
+                stay_in_output_menu = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_output_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<bool> {
         match menu
             .show_output_menu(menu_command, &self.controller, icon_type, spaces)
             .await?
@@ -125,19 +147,21 @@ impl App {
                     Some("refresh"),
                     None
                 );
+                Ok(true)
             }
             Some(OutputMenuOptions::Device(output)) => {
                 self.handle_device_selection(menu, menu_command, &output, icon_type, spaces, true)
                     .await?;
+                Ok(true)
             }
             None => {
                 try_send_log!(
                     self.log_sender,
                     t!("notifications.pw.output_menu_exited").to_string()
                 );
+                Ok(false)
             }
         }
-        Ok(())
     }
 
     async fn handle_input_menu(
@@ -147,6 +171,28 @@ impl App {
         icon_type: &str,
         spaces: usize,
     ) -> Result<()> {
+        let mut stay_in_input_menu = true;
+
+        while stay_in_input_menu {
+            let should_stay = self
+                .handle_input_options(menu, menu_command, icon_type, spaces)
+                .await?;
+
+            if !should_stay {
+                stay_in_input_menu = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_input_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<bool> {
         match menu
             .show_input_menu(menu_command, &self.controller, icon_type, spaces)
             .await?
@@ -163,19 +209,21 @@ impl App {
                     Some("refresh"),
                     None
                 );
+                Ok(true)
             }
             Some(InputMenuOptions::Device(input)) => {
                 self.handle_device_selection(menu, menu_command, &input, icon_type, spaces, false)
                     .await?;
+                Ok(true)
             }
             None => {
                 try_send_log!(
                     self.log_sender,
                     t!("notifications.pw.input_menu_exited").to_string()
                 );
+                Ok(false)
             }
         }
-        Ok(())
     }
 
     async fn handle_device_selection(
