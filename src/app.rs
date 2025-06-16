@@ -19,7 +19,6 @@ const VOLUME_STEP: f32 = 0.05; // 5% volume change per step
 
 pub struct App {
     pub running: bool,
-    pub reset_mode: bool,
     controller: Controller,
     log_sender: UnboundedSender<String>,
     notification_manager: Arc<NotificationManager>,
@@ -38,7 +37,6 @@ impl App {
 
         Ok(Self {
             running: true,
-            reset_mode: false,
             controller,
             log_sender,
             notification_manager,

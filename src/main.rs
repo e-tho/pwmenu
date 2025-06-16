@@ -95,16 +95,7 @@ async fn main() -> Result<()> {
         }
     });
 
-    run_app_loop(
-        &menu,
-        &command_str,
-        &icon_type,
-        spaces,
-        log_sender,
-        icons,
-        root_menu,
-    )
-    .await?;
+    run_app_loop(&menu, &command_str, &icon_type, spaces, log_sender, icons, root_menu).await?;
 
     Ok(())
 }
@@ -120,43 +111,19 @@ async fn run_app_loop(
 ) -> Result<()> {
     let mut app = App::new(menu.clone(), log_sender.clone(), icons.clone()).await?;
 
-    loop {
-        let result = if let Some(ref menu_name) = root_menu {
-            app.wait_for_initialization().await?;
-            match menu_name.as_str() {
-                "outputs" => {
-                    app.run_output_menu(menu, command_str, icon_type, spaces)
-                        .await
-                }
-                "inputs" => {
-                    app.run_input_menu(menu, command_str, icon_type, spaces)
-                        .await
-                }
-                _ => Err(anyhow!("Invalid menu value: {}", menu_name)),
-            }
-        } else {
-            app.run(menu, command_str, icon_type, spaces).await
-        };
-
-        match result {
-            Ok(_) => {
-                if !app.reset_mode {
-                    break;
-                }
-            }
-            Err(err) => {
-                eprintln!("Error during app execution: {:?}", err);
-
-                if !app.reset_mode {
-                    return Err(anyhow!("Fatal error in application: {}", err));
-                }
-            }
+    let result = if let Some(ref menu_name) = root_menu {
+        app.wait_for_initialization().await?;
+        match menu_name.as_str() {
+            "outputs" => app.run_output_menu(menu, command_str, icon_type, spaces).await,
+            "inputs" => app.run_input_menu(menu, command_str, icon_type, spaces).await,
+            _ => Err(anyhow!("Invalid menu value: {}", menu_name)),
         }
+    } else {
+        app.run(menu, command_str, icon_type, spaces).await
+    };
 
-        if app.reset_mode {
-            app = App::new(menu.clone(), log_sender.clone(), icons.clone()).await?;
-            app.reset_mode = false;
-        }
+    if let Err(err) = result {
+        return Err(anyhow!("Fatal error in application: {}", err));
     }
 
     Ok(())
