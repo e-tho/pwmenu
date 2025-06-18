@@ -6,6 +6,7 @@ use crate::pw::{
     restoration::RestorationManager,
 };
 use anyhow::Result;
+use libspa::param::ParamType;
 use log::{debug, error, info, warn};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use tokio::sync::watch;
@@ -27,6 +28,8 @@ pub struct AudioGraph {
     pub default_sink: Option<u32>,
     pub default_source: Option<u32>,
     pub connection_status: ConnectionStatus,
+    pub initial_sync_complete: bool,
+    pub params_sync_complete: bool,
 }
 
 pub struct Store {
@@ -41,6 +44,10 @@ pub struct Store {
     pub core: Rc<pipewire::core::Core>,
     pub metadata_manager: Option<MetadataManager>,
     pub restoration_manager: RestorationManager,
+    pub initial_sync_complete: bool,
+    pub initial_sync_seq: Option<i32>,
+    pub params_sync_complete: bool,
+    pub params_sync_seq: Option<i32>,
 }
 
 impl Store {
@@ -57,24 +64,11 @@ impl Store {
             core,
             metadata_manager: None,
             restoration_manager: RestorationManager::new(),
+            initial_sync_complete: false,
+            initial_sync_seq: None,
+            params_sync_complete: false,
+            params_sync_seq: None,
         }
-    }
-
-    pub fn setup_metadata_manager(
-        &mut self,
-        store_rc: &Rc<RefCell<Store>>,
-        graph_tx: &watch::Sender<AudioGraph>,
-    ) {
-        let store_weak = Rc::downgrade(store_rc);
-        let graph_tx_clone = graph_tx.clone();
-
-        let update_callback = move || {
-            if let Some(store_rc) = store_weak.upgrade() {
-                update_graph(&store_rc, &graph_tx_clone);
-            }
-        };
-
-        self.metadata_manager = Some(MetadataManager::new().with_update_callback(update_callback));
     }
 
     pub fn to_graph(&self) -> AudioGraph {
@@ -102,7 +96,82 @@ impl Store {
             default_sink: self.default_sink,
             default_source: self.default_source,
             connection_status: self.connection_status,
+            initial_sync_complete: self.initial_sync_complete,
+            params_sync_complete: self.params_sync_complete,
         }
+    }
+
+    pub fn handle_sync_done(&mut self, seq: i32) {
+        debug!(
+            "Handling sync done: received seq={}, expecting initial={:?}, params={:?}",
+            seq, self.initial_sync_seq, self.params_sync_seq
+        );
+
+        if let Some(initial_seq) = self.initial_sync_seq {
+            if seq == initial_seq && !self.initial_sync_complete {
+                self.initial_sync_complete = true;
+                debug!("Initial sync complete! (seq: {})", seq);
+                return;
+            }
+        }
+
+        if let Some(params_seq) = self.params_sync_seq {
+            if seq == params_seq && !self.params_sync_complete {
+                self.params_sync_complete = true;
+                debug!("Parameter sync complete! (seq: {})", seq);
+                return;
+            }
+        }
+
+        debug!("Received sync done for untracked sequence: {}", seq);
+    }
+
+    pub fn trigger_parameter_enumeration(&mut self) -> Result<()> {
+        debug!(
+            "Triggering parameter enumeration for {} devices and {} nodes",
+            self.devices.len(),
+            self.nodes.len()
+        );
+
+        for device in self.devices.values() {
+            device
+                .proxy
+                .enum_params(0, Some(ParamType::Route), 0, u32::MAX);
+            device
+                .proxy
+                .enum_params(0, Some(ParamType::Props), 0, u32::MAX);
+            device
+                .proxy
+                .enum_params(0, Some(ParamType::EnumProfile), 0, u32::MAX);
+            device.proxy.enum_params(0, Some(ParamType::Profile), 0, 1);
+        }
+
+        for node in self.nodes.values() {
+            node.proxy
+                .enum_params(0, Some(ParamType::Props), 0, u32::MAX);
+        }
+
+        let params_sync_seq = self.core.sync(0)?.seq();
+        self.params_sync_seq = Some(params_sync_seq);
+
+        Ok(())
+    }
+
+    pub fn setup_metadata_manager(
+        &mut self,
+        store_rc: &Rc<RefCell<Store>>,
+        graph_tx: &watch::Sender<AudioGraph>,
+    ) {
+        let store_weak = Rc::downgrade(store_rc);
+        let graph_tx_clone = graph_tx.clone();
+
+        let update_callback = move || {
+            if let Some(store_rc) = store_weak.upgrade() {
+                update_graph(&store_rc, &graph_tx_clone);
+            }
+        };
+
+        self.metadata_manager = Some(MetadataManager::new().with_update_callback(update_callback));
     }
 
     pub fn set_pwmenu_client_id(&mut self, id: u32) {

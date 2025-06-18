@@ -10,7 +10,6 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::pw::{
     commands::PwCommand,
     graph::{update_graph, AudioGraph, ConnectionStatus, Store},
-    nodes::NodeType,
 };
 
 pub struct PwEngine {
@@ -45,31 +44,40 @@ impl PwEngine {
 
         loop {
             let graph = graph_rx.borrow().clone();
-            let devices_with_nodes = graph
-                .devices
-                .values()
-                .filter(|d| !d.nodes.is_empty())
-                .count();
-            let audio_nodes = graph
-                .nodes
-                .values()
-                .filter(|n| matches!(n.node_type, NodeType::Sink | NodeType::Source))
-                .count();
 
             if graph.connection_status == crate::pw::ConnectionStatus::Connected
-                && !graph.devices.is_empty()
-                && devices_with_nodes == graph.devices.len()
-                && audio_nodes > 0
+                && graph.initial_sync_complete
             {
                 break;
             }
 
             if graph_rx.changed().await.is_err() {
-                return Err(anyhow!("Graph updates channel closed"));
+                return Err(anyhow!("Graph updates channel closed during init phase 1"));
+            }
+        }
+
+        self.trigger_parameter_enumeration().await?;
+
+        loop {
+            let graph = graph_rx.borrow().clone();
+
+            if graph.params_sync_complete {
+                break;
+            }
+
+            if graph_rx.changed().await.is_err() {
+                return Err(anyhow!("Graph updates channel closed during init phase 2"));
             }
         }
 
         Ok(())
+    }
+
+    pub async fn trigger_parameter_enumeration(&self) -> Result<()> {
+        self.send_command_and_wait(|rs| PwCommand::TriggerParameterEnumeration {
+            result_sender: rs,
+        })
+        .await
     }
 
     pub fn graph(&self) -> AudioGraph {
@@ -326,13 +334,18 @@ fn run_pipewire_loop(
             .done({
                 let store = store_clone;
                 let graph_tx = graph_tx_clone;
-                move |_id, _seq| {
-                    debug!("Core: Done event received (initial sync likely complete).");
+                move |_id, seq| {
+                    let seq_num = seq.seq();
+                    store.borrow_mut().handle_sync_done(seq_num);
                     update_graph(&store, &graph_tx);
                 }
             })
             .register()
     };
+
+    // Call sync after both listeners are ready
+    let initial_sync_seq = core.sync(0)?.seq();
+    store.borrow_mut().initial_sync_seq = Some(initial_sync_seq);
 
     info!("Starting PipeWire event loop...");
     let mainloop_clone = mainloop.clone();
@@ -367,6 +380,9 @@ fn run_pipewire_loop(
                 }
 
                 let cmd_processing_result = match cmd {
+                    PwCommand::TriggerParameterEnumeration { result_sender } => {
+                        result_sender.send(store.borrow_mut().trigger_parameter_enumeration())
+                    }
                     PwCommand::SetNodeVolume {
                         node_id,
                         volume,
