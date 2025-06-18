@@ -95,7 +95,16 @@ async fn main() -> Result<()> {
         }
     });
 
-    run_app_loop(&menu, &command_str, &icon_type, spaces, log_sender, icons, root_menu).await?;
+    run_app_loop(
+        &menu,
+        &command_str,
+        &icon_type,
+        spaces,
+        log_sender,
+        icons,
+        root_menu,
+    )
+    .await?;
 
     Ok(())
 }
@@ -114,8 +123,14 @@ async fn run_app_loop(
     let result = if let Some(ref menu_name) = root_menu {
         app.wait_for_initialization().await?;
         match menu_name.as_str() {
-            "outputs" => app.run_output_menu(menu, command_str, icon_type, spaces).await,
-            "inputs" => app.run_input_menu(menu, command_str, icon_type, spaces).await,
+            "outputs" => {
+                app.run_output_menu(menu, command_str, icon_type, spaces)
+                    .await
+            }
+            "inputs" => {
+                app.run_input_menu(menu, command_str, icon_type, spaces)
+                    .await
+            }
             _ => Err(anyhow!("Invalid menu value: {}", menu_name)),
         }
     } else {
