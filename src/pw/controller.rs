@@ -11,6 +11,24 @@ use crate::pw::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum FormFactorPriority {
+    Headphones = 0,
+    Headset = 1,
+    HandsFree = 2,
+    Handset = 3,
+    Speaker = 4,
+    Microphone = 5,
+    Webcam = 6,
+    Portable = 7,
+    Car = 8,
+    Hifi = 9,
+    Tv = 10,
+    Computer = 11,
+    Internal = 12,
+    Unknown = 13,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum BusPriority {
     Usb = 0,
     Bluetooth = 1,
@@ -101,9 +119,14 @@ impl Controller {
             b.is_default
                 .cmp(&a.is_default)
                 .then_with(|| {
-                    let a_priority = self.get_bus_priority(a, &graph);
-                    let b_priority = self.get_bus_priority(b, &graph);
-                    a_priority.cmp(&b_priority)
+                    let a_form_factor = self.get_form_factor_priority(a, &graph);
+                    let b_form_factor = self.get_form_factor_priority(b, &graph);
+                    a_form_factor.cmp(&b_form_factor)
+                })
+                .then_with(|| {
+                    let a_bus = self.get_bus_priority(a, &graph);
+                    let b_bus = self.get_bus_priority(b, &graph);
+                    a_bus.cmp(&b_bus)
                 })
                 .then_with(|| {
                     a.description
@@ -113,6 +136,33 @@ impl Controller {
                 })
         });
         nodes
+    }
+
+    fn get_form_factor_priority(&self, node: &Node, graph: &AudioGraph) -> FormFactorPriority {
+        if let Some(device_id) = node.device_id {
+            if let Some(device) = graph.devices.get(&device_id) {
+                match device.form_factor.as_deref() {
+                    Some("headphone") => FormFactorPriority::Headphones,
+                    Some("headset") => FormFactorPriority::Headset,
+                    Some("hands-free") => FormFactorPriority::HandsFree,
+                    Some("handset") => FormFactorPriority::Handset,
+                    Some("speaker") => FormFactorPriority::Speaker,
+                    Some("microphone") => FormFactorPriority::Microphone,
+                    Some("webcam") => FormFactorPriority::Webcam,
+                    Some("portable") => FormFactorPriority::Portable,
+                    Some("car") => FormFactorPriority::Car,
+                    Some("hifi") => FormFactorPriority::Hifi,
+                    Some("tv") => FormFactorPriority::Tv,
+                    Some("computer") => FormFactorPriority::Computer,
+                    Some("internal") => FormFactorPriority::Internal,
+                    _ => FormFactorPriority::Unknown,
+                }
+            } else {
+                FormFactorPriority::Unknown
+            }
+        } else {
+            FormFactorPriority::Unknown
+        }
     }
 
     fn get_bus_priority(&self, node: &Node, graph: &AudioGraph) -> BusPriority {

@@ -52,6 +52,10 @@ fn get_device_bus(props: &DictRef) -> Option<&str> {
     props.get("device.bus")
 }
 
+fn get_device_form_factor(props: &DictRef) -> Option<&str> {
+    props.get("device.form-factor")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Device {
     pub id: u32,
@@ -59,6 +63,7 @@ pub struct Device {
     pub description: Option<String>,
     pub device_type: DeviceType,
     pub bus: Option<String>,
+    pub form_factor: Option<String>,
     pub nodes: Vec<u32>,
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
@@ -72,6 +77,7 @@ pub struct DeviceInternal {
     pub description: Option<String>,
     pub device_type: DeviceType,
     pub bus: Option<String>,
+    pub form_factor: Option<String>,
     pub nodes: Vec<u32>,
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
@@ -93,6 +99,7 @@ impl DeviceInternal {
             description: self.description.clone(),
             device_type: self.device_type,
             bus: self.bus.clone(),
+            form_factor: self.form_factor.clone(),
             nodes: self.nodes.clone(),
             profiles: self.profiles.clone(),
             current_profile_index: self.current_profile_index,
@@ -224,6 +231,7 @@ impl Store {
             description,
             device_type,
             bus: None,
+            form_factor: None,
             nodes: self
                 .nodes
                 .values()
@@ -320,13 +328,23 @@ impl Store {
                             Ok(mut store_borrow) => {
                                 if let Some(props) = info.props() {
                                     let bus = get_device_bus(props).map(str::to_string);
+                                    let form_factor =
+                                        get_device_form_factor(props).map(str::to_string);
+
                                     if let Some(device) = store_borrow.devices.get_mut(&device_id) {
+                                        let mut updated = false;
+
                                         if device.bus != bus {
                                             device.bus = bus;
-                                            true
-                                        } else {
-                                            false
+                                            updated = true;
                                         }
+
+                                        if device.form_factor != form_factor {
+                                            device.form_factor = form_factor;
+                                            updated = true;
+                                        }
+
+                                        updated
                                     } else {
                                         false
                                     }
