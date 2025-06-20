@@ -334,14 +334,19 @@ impl Store {
                                     if let Some(device) = store_borrow.devices.get_mut(&device_id) {
                                         let mut updated = false;
 
-                                        if device.bus != bus {
-                                            device.bus = bus;
-                                            updated = true;
+                                        if let Some(new_bus) = bus {
+                                            if device.bus.as_ref() != Some(&new_bus) {
+                                                device.bus = Some(new_bus);
+                                                updated = true;
+                                            }
                                         }
 
-                                        if device.form_factor != form_factor {
-                                            device.form_factor = form_factor;
-                                            updated = true;
+                                        if let Some(new_form_factor) = form_factor {
+                                            if device.form_factor.as_ref() != Some(&new_form_factor)
+                                            {
+                                                device.form_factor = Some(new_form_factor);
+                                                updated = true;
+                                            }
                                         }
 
                                         updated
