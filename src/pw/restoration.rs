@@ -1,4 +1,4 @@
-use crate::pw::{graph::Store, nodes::NodeType};
+use crate::pw::{devices::DeviceInternal, graph::Store, nodes::NodeType};
 use anyhow::{anyhow, Result};
 use log::debug;
 use std::{collections::HashMap, time::Instant};
@@ -63,7 +63,7 @@ impl RestorationManager {
         let device = store.devices.get(&device_id)?;
 
         // Only handle USB devices
-        if !Self::is_usb_device(&device.name) {
+        if !Self::is_usb_device(device) {
             return None;
         }
 
@@ -215,8 +215,8 @@ impl RestorationManager {
         Ok(Some((sink_ids, source_ids)))
     }
 
-    fn is_usb_device(device_name: &str) -> bool {
-        device_name.contains(".usb-") || device_name.contains("USB")
+    fn is_usb_device(device: &DeviceInternal) -> bool {
+        device.bus.as_deref() == Some("usb")
     }
 
     pub fn cleanup_expired(&mut self) {
