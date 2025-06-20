@@ -48,59 +48,8 @@ impl Profile {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum ConnectionType {
-    Usb = 1,
-    Internal = 2,
-    DisplayAudio = 3,
-    Bluetooth = 4,
-    Unknown = 5,
-}
-
-impl ConnectionType {
-    pub fn from_properties(props: &DictRef) -> Self {
-        if let Some(bus) = props.get("device.bus") {
-            match bus {
-                "usb" => return ConnectionType::Usb,
-                "bluetooth" => return ConnectionType::Bluetooth,
-                "pci" => {
-                    if let Some(form_factor) = props.get("device.form_factor") {
-                        if form_factor == "hdmi" || form_factor == "displayport" {
-                            return ConnectionType::DisplayAudio;
-                        }
-                    }
-                    return ConnectionType::Internal;
-                }
-                _ => {}
-            }
-        }
-
-        if let Some(device_name) = props.get("device.name") {
-            if device_name.starts_with("alsa_card.usb-") {
-                return ConnectionType::Usb;
-            }
-            if device_name.starts_with("alsa_card.pci-") {
-                if let Some(desc) = props.get("device.description") {
-                    if desc.to_lowercase().contains("hdmi")
-                        || desc.to_lowercase().contains("displayport")
-                    {
-                        return ConnectionType::DisplayAudio;
-                    }
-                }
-                if let Some(nick) = props.get("device.nick") {
-                    if nick.to_lowercase().contains("hdmi") {
-                        return ConnectionType::DisplayAudio;
-                    }
-                }
-                return ConnectionType::Internal;
-            }
-            if device_name.contains("bluez") {
-                return ConnectionType::Bluetooth;
-            }
-        }
-
-        ConnectionType::Unknown
-    }
+fn get_device_bus(props: &DictRef) -> Option<&str> {
+    props.get("device.bus")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,7 +58,7 @@ pub struct Device {
     pub name: String,
     pub description: Option<String>,
     pub device_type: DeviceType,
-    pub connection_type: ConnectionType,
+    pub bus: Option<String>,
     pub nodes: Vec<u32>,
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
@@ -122,7 +71,7 @@ pub struct DeviceInternal {
     pub name: String,
     pub description: Option<String>,
     pub device_type: DeviceType,
-    pub connection_type: ConnectionType,
+    pub bus: Option<String>,
     pub nodes: Vec<u32>,
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
@@ -143,7 +92,7 @@ impl DeviceInternal {
             name: self.name.clone(),
             description: self.description.clone(),
             device_type: self.device_type,
-            connection_type: self.connection_type,
+            bus: self.bus.clone(),
             nodes: self.nodes.clone(),
             profiles: self.profiles.clone(),
             current_profile_index: self.current_profile_index,
@@ -268,14 +217,13 @@ impl Store {
             Some("Audio/Device/Source") | Some("Audio/Source") => DeviceType::Source,
             _ => DeviceType::Unknown,
         };
-        let connection_type = ConnectionType::from_properties(props);
 
         let mut device = DeviceInternal {
             id: global.id,
             name: name.clone(),
             description,
             device_type,
-            connection_type,
+            bus: None,
             nodes: self
                 .nodes
                 .values()
@@ -294,7 +242,7 @@ impl Store {
             input_route_device: None,
         };
 
-        self.setup_targeted_volume_monitoring(&mut device, store_rc, graph_tx);
+        self.setup_device_monitoring(&mut device, store_rc, graph_tx);
 
         self.devices.insert(global.id, device);
         debug!("Added device {}: '{}'", global.id, name);
@@ -324,7 +272,7 @@ impl Store {
         }
     }
 
-    pub fn setup_targeted_volume_monitoring(
+    pub fn setup_device_monitoring(
         &self,
         device: &mut DeviceInternal,
         store_rc: &Rc<RefCell<Store>>,
@@ -337,21 +285,66 @@ impl Store {
         let listener = device
             .proxy
             .add_listener_local()
-            .param(move |_seq, param_type, _index, _next, pod_opt| {
-                if let Some(pod) = pod_opt {
+            .param({
+                let store_weak = store_weak.clone();
+                let graph_tx = graph_tx_clone.clone();
+                move |_seq, param_type, _index, _next, pod_opt| {
+                    if let Some(pod) = pod_opt {
+                        if let Some(store_rc) = store_weak.upgrade() {
+                            let updated = match store_rc.try_borrow_mut() {
+                                Ok(mut store_borrow) => {
+                                    store_borrow.handle_device_parameter(device_id, param_type, pod)
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "Failed to borrow store for device {}: {}",
+                                        device_id, e
+                                    );
+                                    return;
+                                }
+                            };
+
+                            if updated {
+                                crate::pw::graph::update_graph(&store_rc, &graph_tx);
+                            }
+                        }
+                    }
+                }
+            })
+            .info({
+                let store_weak = store_weak.clone();
+                let graph_tx = graph_tx_clone.clone();
+                move |info| {
                     if let Some(store_rc) = store_weak.upgrade() {
                         let updated = match store_rc.try_borrow_mut() {
                             Ok(mut store_borrow) => {
-                                store_borrow.handle_device_parameter(device_id, param_type, pod)
+                                if let Some(props) = info.props() {
+                                    let bus = get_device_bus(props).map(str::to_string);
+                                    if let Some(device) = store_borrow.devices.get_mut(&device_id) {
+                                        if device.bus != bus {
+                                            device.bus = bus;
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
                             }
                             Err(e) => {
-                                error!("Failed to borrow store for device {}: {}", device_id, e);
-                                return;
+                                error!(
+                                    "Failed to borrow store for device info {}: {}",
+                                    device_id, e
+                                );
+                                false
                             }
                         };
 
                         if updated {
-                            crate::pw::graph::update_graph(&store_rc, &graph_tx_clone);
+                            crate::pw::graph::update_graph(&store_rc, &graph_tx);
                         }
                     }
                 }

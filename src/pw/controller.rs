@@ -3,12 +3,20 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::pw::{
-    devices::{ConnectionType, DeviceType, Profile},
+    devices::{DeviceType, Profile},
     engine::PwEngine,
     nodes::{Node, NodeType},
     volume::VolumeResolver,
     AudioGraph,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum BusPriority {
+    Usb = 0,
+    Bluetooth = 1,
+    Pci = 2,
+    Unknown = 3,
+}
 
 pub struct Controller {
     engine: Arc<PwEngine>,
@@ -87,12 +95,15 @@ impl Controller {
     }
 
     fn sort_nodes_by_priority(&self, mut nodes: Vec<Node>) -> Vec<Node> {
+        let graph = self.engine.graph();
+
         nodes.sort_by(|a, b| {
             b.is_default
                 .cmp(&a.is_default)
                 .then_with(|| {
-                    self.get_node_connection_type(a)
-                        .cmp(&self.get_node_connection_type(b))
+                    let a_priority = self.get_bus_priority(a, &graph);
+                    let b_priority = self.get_bus_priority(b, &graph);
+                    a_priority.cmp(&b_priority)
                 })
                 .then_with(|| {
                     a.description
@@ -104,14 +115,21 @@ impl Controller {
         nodes
     }
 
-    fn get_node_connection_type(&self, node: &Node) -> ConnectionType {
+    fn get_bus_priority(&self, node: &Node, graph: &AudioGraph) -> BusPriority {
         if let Some(device_id) = node.device_id {
-            let graph = self.engine.graph();
             if let Some(device) = graph.devices.get(&device_id) {
-                return device.connection_type;
+                match device.bus.as_deref() {
+                    Some("bluetooth") => BusPriority::Bluetooth,
+                    Some("pci") => BusPriority::Pci,
+                    Some("usb") => BusPriority::Usb,
+                    _ => BusPriority::Unknown,
+                }
+            } else {
+                BusPriority::Unknown
             }
+        } else {
+            BusPriority::Unknown
         }
-        ConnectionType::Unknown
     }
 
     pub fn get_output_devices(&self) -> Vec<(u32, String)> {
