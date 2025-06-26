@@ -272,7 +272,7 @@ impl App {
         let node_clone = nodes
             .iter()
             .find(|node| {
-                let formatted = menu.format_node_display(node, icon_type, spaces);
+                let formatted = menu.format_node_display(node, &self.controller, icon_type, spaces);
                 menu.clean_menu_output(&formatted, icon_type) == cleaned_output
             })
             .cloned();

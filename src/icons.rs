@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::pw::{controller::DeviceInfo, NodeType};
+
 #[derive(Clone)]
 pub struct IconDefinition {
     single: String,
@@ -197,25 +199,46 @@ impl Icons {
             IconDefinition::simple("microphone-sensitivity-high-symbolic"),
         );
 
-        // Device types
+        font_icons.insert("analog", '\u{f1543}');
+        xdg_icons.insert("analog", IconDefinition::simple("audio-card-symbolic"));
 
-        font_icons.insert("headphones", '\u{f02cb}');
+        font_icons.insert("digital", '\u{f0697}');
+        xdg_icons.insert("digital", IconDefinition::simple("computer-symbolic"));
+
+        font_icons.insert("soundbar", '\u{f17db}');
         xdg_icons.insert(
-            "headphones",
-            IconDefinition::simple("audio-headphones-symbolic"),
+            "soundbar",
+            IconDefinition::simple("audio-speakers-symbolic"),
         );
+
+        font_icons.insert("interface", '\u{f186c}');
+        xdg_icons.insert("interface", IconDefinition::simple("audio-card-symbolic"));
+
+        font_icons.insert("loopback", '\u{f0456}');
+        xdg_icons.insert(
+            "loopback",
+            IconDefinition::with_fallbacks(
+                None,
+                "media-playlist-repeat-symbolic,media-repeat-symbolic",
+            ),
+        );
+
+        // Form factor
+
+        font_icons.insert("internal", '\u{f1543}');
+        xdg_icons.insert("internal", IconDefinition::simple("audio-card-symbolic"));
 
         font_icons.insert("speaker", '\u{f04c3}');
         xdg_icons.insert("speaker", IconDefinition::simple("audio-speakers-symbolic"));
 
-        font_icons.insert("hdmi", '\u{f0841}');
-        xdg_icons.insert(
-            "hdmi",
-            IconDefinition::with_fallbacks(
-                None,
-                "video-display-symbolic,monitor-symbolic,display-symbolic",
-            ),
-        );
+        font_icons.insert("handset", '\u{f03f2}');
+        xdg_icons.insert("handset", IconDefinition::simple("phone-symbolic"));
+
+        font_icons.insert("tv", '\u{f0502}');
+        xdg_icons.insert("tv", IconDefinition::simple("video-display-symbolic"));
+
+        font_icons.insert("webcam", '\u{f05a0}');
+        xdg_icons.insert("webcam", IconDefinition::simple("camera-web-symbolic"));
 
         font_icons.insert("microphone", '\u{f036c}');
         xdg_icons.insert(
@@ -223,20 +246,43 @@ impl Icons {
             IconDefinition::simple("audio-input-microphone-symbolic"),
         );
 
-        font_icons.insert("analog", '\u{f1543}');
-        xdg_icons.insert("analog", IconDefinition::simple("audio-card-symbolic"));
+        font_icons.insert("headset", '\u{f02ce}');
+        xdg_icons.insert("headset", IconDefinition::simple("audio-headset-symbolic"));
 
-        font_icons.insert("digital", '\u{f0697}');
-        xdg_icons.insert("digital", IconDefinition::simple("computer-symbolic"));
-
-        font_icons.insert("bluetooth", '\u{f00af}');
+        font_icons.insert("headphone", '\u{f02cb}');
         xdg_icons.insert(
-            "bluetooth",
+            "headphone",
+            IconDefinition::simple("audio-headphones-symbolic"),
+        );
+
+        font_icons.insert("hands-free", '\u{f02ce}');
+        xdg_icons.insert(
+            "hands-free",
+            IconDefinition::simple("audio-headset-symbolic"),
+        );
+
+        font_icons.insert("car", '\u{f010b}');
+        xdg_icons.insert(
+            "car",
             IconDefinition::with_fallbacks(
                 None,
                 "bluetooth-symbolic,network-bluetooth-symbolic,bluetooth-active-symbolic",
             ),
         );
+
+        font_icons.insert("hifi", '\u{f0030}');
+        xdg_icons.insert("hifi", IconDefinition::simple("audio-speakers-symbolic"));
+
+        font_icons.insert("computer", '\u{f0379}');
+        xdg_icons.insert("computer", IconDefinition::simple("computer-symbolic"));
+
+        font_icons.insert("portable", '\u{f011c}');
+        xdg_icons.insert("portable", IconDefinition::simple("smartphone-symbolic"));
+
+        // Bus type
+
+        font_icons.insert("pci", '\u{f1543}');
+        xdg_icons.insert("pci", IconDefinition::simple("audio-card-symbolic"));
 
         font_icons.insert("usb", '\u{f11f0}');
         xdg_icons.insert(
@@ -244,6 +290,24 @@ impl Icons {
             IconDefinition::with_fallbacks(
                 None,
                 "media-removable-symbolic,drive-removable-media-usb-symbolic",
+            ),
+        );
+
+        font_icons.insert("display_audio", '\u{f0841}');
+        xdg_icons.insert(
+            "display_audio",
+            IconDefinition::with_fallbacks(
+                None,
+                "video-display-symbolic,monitor-symbolic,display-symbolic",
+            ),
+        );
+
+        font_icons.insert("bluetooth", '\u{f00af}');
+        xdg_icons.insert(
+            "bluetooth",
+            IconDefinition::with_fallbacks(
+                None,
+                "bluetooth-symbolic,network-bluetooth-symbolic,bluetooth-active-symbolic",
             ),
         );
 
@@ -323,19 +387,36 @@ impl Icons {
         }
     }
 
-    pub fn get_device_icon(&self, device_type: &str, icon_type: &str) -> String {
-        let icon_key = match device_type.to_lowercase().as_str() {
-            s if s.contains("headphone") => "headphones",
-            s if s.contains("speaker") => "speaker",
-            s if s.contains("hdmi") => "hdmi",
-            s if s.contains("mic") => "microphone",
-            s if s.contains("analog") => "analog",
-            s if s.contains("digital") => "digital",
-            s if s.contains("bluetooth") => "bluetooth",
-            s if s.contains("usb") => "usb",
+    pub fn get_device_icon(&self, device_info: &DeviceInfo, icon_type: &str) -> String {
+        if let Some(media_class) = &device_info.media_class {
+            if media_class.contains("Monitor") {
+                return self.get_icon("monitor", icon_type);
+            }
+            if media_class.contains("Virtual") {
+                return self.get_icon("virtual", icon_type);
+            }
+        }
+
+        if device_info.is_muted {
+            let icon_key = match device_info.node_type {
+                NodeType::Source => "input_mute",
+                _ => "output_mute",
+            };
+            return self.get_icon(icon_key, icon_type);
+        }
+
+        if let Some(form_factor) = &device_info.form_factor {
+            return self.get_icon(form_factor, icon_type);
+        }
+
+        if let Some(bus) = &device_info.bus {
+            return self.get_icon(bus, icon_type);
+        }
+
+        let icon_key = match device_info.node_type {
+            NodeType::Source => "input",
             _ => "output",
         };
-
         self.get_icon(icon_key, icon_type)
     }
 }

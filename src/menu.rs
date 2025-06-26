@@ -1,11 +1,7 @@
 use crate::{
     icons::Icons,
     launcher::{Launcher, LauncherType},
-    pw::{
-        controller::Controller,
-        nodes::{Node, NodeType},
-        Profile,
-    },
+    pw::{controller::Controller, nodes::Node, Profile},
 };
 use anyhow::Result;
 use rust_i18n::t;
@@ -231,7 +227,13 @@ impl Menu {
             .join("\n")
     }
 
-    pub fn format_node_display(&self, node: &Node, icon_type: &str, spaces: usize) -> String {
+    pub fn format_node_display(
+        &self,
+        node: &Node,
+        controller: &Controller,
+        icon_type: &str,
+        spaces: usize,
+    ) -> String {
         let mut display_name = node.description.as_ref().unwrap_or(&node.name).clone();
 
         if let Some(app_name) = &node.application_name {
@@ -245,29 +247,8 @@ impl Menu {
             display_name.push_str(&format!(" {}", self.icons.get_icon("default", "generic")));
         }
 
-        let icon = if node.volume.muted {
-            if matches!(node.node_type, NodeType::Source) {
-                self.icons.get_icon("input_mute", icon_type)
-            } else {
-                self.icons.get_icon("output_mute", icon_type)
-            }
-        } else if node
-            .media_class
-            .as_ref()
-            .is_some_and(|m| m.contains("Monitor"))
-        {
-            self.icons.get_icon("monitor", icon_type)
-        } else if node
-            .media_class
-            .as_ref()
-            .is_some_and(|m| m.contains("Virtual"))
-        {
-            self.icons.get_icon("virtual", icon_type)
-        } else if matches!(node.node_type, NodeType::Source) {
-            self.icons.get_icon("input", icon_type)
-        } else {
-            self.icons.get_icon("output", icon_type)
-        };
+        let device_info = controller.get_device_info(node);
+        let icon = self.icons.get_device_icon(&device_info, icon_type);
 
         self.format_display_with_icon(&display_name, &icon, icon_type, spaces)
     }
@@ -324,7 +305,7 @@ impl Menu {
         let output_nodes = controller.get_output_nodes();
 
         for node in output_nodes {
-            let node_display = self.format_node_display(&node, icon_type, spaces);
+            let node_display = self.format_node_display(&node, controller, icon_type, spaces);
             input.push_str(&format!("\n{}", node_display));
         }
 
@@ -360,7 +341,7 @@ impl Menu {
         let input_nodes = controller.get_input_nodes();
 
         for node in input_nodes {
-            let node_display = self.format_node_display(&node, icon_type, spaces);
+            let node_display = self.format_node_display(&node, controller, icon_type, spaces);
             input.push_str(&format!("\n{}", node_display));
         }
 

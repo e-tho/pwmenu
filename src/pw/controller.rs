@@ -36,6 +36,15 @@ enum BusPriority {
     Unknown = 3,
 }
 
+#[derive(Debug, Clone)]
+pub struct DeviceInfo {
+    pub form_factor: Option<String>,
+    pub bus: Option<String>,
+    pub media_class: Option<String>,
+    pub is_muted: bool,
+    pub node_type: NodeType,
+}
+
 pub struct Controller {
     engine: Arc<PwEngine>,
     log_sender: UnboundedSender<String>,
@@ -344,6 +353,26 @@ impl Controller {
 
     pub fn get_default_source(&self) -> Option<u32> {
         self.engine.graph().default_source
+    }
+
+    pub fn get_device_info(&self, node: &Node) -> DeviceInfo {
+        let mut device_info = DeviceInfo {
+            form_factor: None,
+            bus: None,
+            media_class: node.media_class.clone(),
+            is_muted: node.volume.muted,
+            node_type: node.node_type,
+        };
+
+        if let Some(device_id) = node.device_id {
+            let graph = self.engine.graph();
+            if let Some(device) = graph.devices.get(&device_id) {
+                device_info.form_factor = device.form_factor.clone();
+                device_info.bus = device.bus.clone();
+            }
+        }
+
+        device_info
     }
 
     pub fn get_device_profiles(&self, device_id: u32) -> Vec<Profile> {
