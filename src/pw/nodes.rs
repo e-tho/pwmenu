@@ -181,8 +181,7 @@ impl Store {
                                     Ok(s) => s,
                                     Err(e) => {
                                         error!(
-                                            "Failed to borrow store in node param cb {}: {}",
-                                            node_id, e
+                                            "Failed to borrow store in node param cb {node_id}: {e}"
                                         );
                                         return;
                                     }
@@ -346,10 +345,7 @@ impl Store {
         node.proxy.set_param(ParamType::Props, 0, pod_ref);
         node.volume = volume_value;
 
-        debug!(
-            "Sent volume command for node {} to {}",
-            node_id, volume_value
-        );
+        debug!("Sent volume command for node {node_id} to {volume_value}");
         Ok(())
     }
 
@@ -383,7 +379,7 @@ impl Store {
         node.proxy.set_param(ParamType::Props, 0, pod_ref);
         node.muted = mute;
 
-        debug!("Sent mute command for node {} to {}", node_id, mute);
+        debug!("Sent mute command for node {node_id} to {mute}");
         Ok(())
     }
 
@@ -403,7 +399,7 @@ impl Store {
         let node_name = node.name.clone();
 
         let old_default = self.default_sink.replace(node_id);
-        debug!("Set default sink to node {}", node_id);
+        debug!("Set default sink to node {node_id}");
 
         if let Some(old_id) = old_default {
             if let Some(old_node) = self.nodes.get_mut(&old_id) {
@@ -418,7 +414,7 @@ impl Store {
         if let Some(metadata_manager) = &self.metadata_manager {
             if metadata_manager.is_available() {
                 if let Err(e) = metadata_manager.set_default_sink(&node_name) {
-                    warn!("Failed to set system-wide default sink: {}", e);
+                    warn!("Failed to set system-wide default sink: {e}");
                 } else {
                     debug!("System-wide default sink set successfully");
                 }
@@ -446,7 +442,7 @@ impl Store {
         let node_name = node.name.clone();
 
         let old_default = self.default_source.replace(node_id);
-        debug!("Set default source to node {}", node_id);
+        debug!("Set default source to node {node_id}");
 
         if let Some(old_id) = old_default {
             if let Some(old_node) = self.nodes.get_mut(&old_id) {
@@ -461,7 +457,7 @@ impl Store {
         if let Some(metadata_manager) = &self.metadata_manager {
             if metadata_manager.is_available() {
                 if let Err(e) = metadata_manager.set_default_source(&node_name) {
-                    warn!("Failed to set system-wide default source: {}", e);
+                    warn!("Failed to set system-wide default source: {e}");
                 } else {
                     debug!("System-wide default source set successfully");
                 }

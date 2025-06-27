@@ -219,7 +219,7 @@ impl Menu {
                 let text = text.as_ref();
                 match icon_type {
                     "font" => format!("{}{}{}", icon, " ".repeat(spaces), text),
-                    "xdg" => format!("{}\0icon\x1f{}", text, icon),
+                    "xdg" => format!("{text}\0icon\x1f{icon}"),
                     _ => text.to_string(),
                 }
             })
@@ -237,7 +237,7 @@ impl Menu {
         let mut display_name = node.description.as_ref().unwrap_or(&node.name).clone();
 
         if let Some(app_name) = &node.application_name {
-            display_name = format!("{} ({})", display_name, app_name);
+            display_name = format!("{display_name} ({app_name})");
         }
 
         let volume_str = format!(" [{}%]", node.volume.percent());
@@ -261,7 +261,7 @@ impl Menu {
         spaces: usize,
     ) -> String {
         match icon_type {
-            "xdg" => format!("{}\0icon\x1f{}", text, icon),
+            "xdg" => format!("{text}\0icon\x1f{icon}"),
             "font" | "generic" => format!("{}{}{}", icon, " ".repeat(spaces), text),
             _ => text.to_string(),
         }
@@ -306,7 +306,7 @@ impl Menu {
 
         for node in output_nodes {
             let node_display = self.format_node_display(&node, controller, icon_type, spaces);
-            input.push_str(&format!("\n{}", node_display));
+            input.push_str(&format!("\n{node_display}"));
         }
 
         let prompt = t!("menus.output.prompt");
@@ -342,7 +342,7 @@ impl Menu {
 
         for node in input_nodes {
             let node_display = self.format_node_display(&node, controller, icon_type, spaces);
-            input.push_str(&format!("\n{}", node_display));
+            input.push_str(&format!("\n{node_display}"));
         }
 
         let prompt = t!("menus.input.prompt");

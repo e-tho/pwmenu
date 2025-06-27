@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
 
     tokio::spawn(async move {
         while let Some(log) = log_receiver.recv().await {
-            println!("LOG: {}", log);
+            println!("LOG: {log}");
         }
     });
 

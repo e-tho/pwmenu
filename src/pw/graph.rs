@@ -110,7 +110,7 @@ impl Store {
         if let Some(initial_seq) = self.initial_sync_seq {
             if seq == initial_seq && !self.initial_sync_complete {
                 self.initial_sync_complete = true;
-                debug!("Initial sync complete! (seq: {})", seq);
+                debug!("Initial sync complete! (seq: {seq})");
                 return;
             }
         }
@@ -118,12 +118,12 @@ impl Store {
         if let Some(params_seq) = self.params_sync_seq {
             if seq == params_seq && !self.params_sync_complete {
                 self.params_sync_complete = true;
-                debug!("Parameter sync complete! (seq: {})", seq);
+                debug!("Parameter sync complete! (seq: {seq})");
                 return;
             }
         }
 
-        debug!("Received sync done for untracked sequence: {}", seq);
+        debug!("Received sync done for untracked sequence: {seq}");
     }
 
     pub fn trigger_parameter_enumeration(&mut self) -> Result<()> {
@@ -176,7 +176,7 @@ impl Store {
 
     pub fn set_pwmenu_client_id(&mut self, id: u32) {
         self.pwmenu_client_id = Some(id);
-        info!("Internal PipeWire client ID set to: {}", id);
+        info!("Internal PipeWire client ID set to: {id}");
     }
 
     pub fn update_defaults_from_metadata(&mut self) {
@@ -204,7 +204,7 @@ impl Store {
                     if !node.is_default {
                         node.is_default = true;
                         self.default_sink = Some(*node_id);
-                        debug!("Set node {} as default sink from metadata", node_id);
+                        debug!("Set node {node_id} as default sink from metadata");
                     }
                     found_default = true;
                 } else if node.is_default {
@@ -242,7 +242,7 @@ impl Store {
                         if !node.is_default {
                             node.is_default = true;
                             self.default_source = Some(*node_id);
-                            debug!("Set node {} as default source from metadata", node_id);
+                            debug!("Set node {node_id} as default source from metadata");
                         }
                     } else if node.is_default {
                         node.is_default = false;
@@ -292,16 +292,16 @@ pub fn update_graph(store_rc: &Rc<RefCell<Store>>, graph_tx: &watch::Sender<Audi
         for (sink_id, source_id) in nodes_to_restore {
             if sink_id != 0 {
                 if let Err(e) = store.set_default_sink(sink_id) {
-                    warn!("Failed to restore default sink {}: {}", sink_id, e);
+                    warn!("Failed to restore default sink {sink_id}: {e}");
                 } else {
-                    debug!("Restored default sink: {}", sink_id);
+                    debug!("Restored default sink: {sink_id}");
                 }
             }
             if source_id != 0 {
                 if let Err(e) = store.set_default_source(source_id) {
-                    warn!("Failed to restore default source {}: {}", source_id, e);
+                    warn!("Failed to restore default source {source_id}: {e}");
                 } else {
-                    debug!("Restored default source: {}", source_id);
+                    debug!("Restored default source: {source_id}");
                 }
             }
         }

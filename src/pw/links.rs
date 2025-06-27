@@ -249,10 +249,7 @@ impl Store {
                 .values()
                 .any(|link| link.output_port == output_port_id && link.input_port == input_port_id)
             {
-                debug!(
-                    "Link {}p -> {}p already exists, skipping.",
-                    output_port_id, input_port_id
-                );
+                debug!("Link {output_port_id}p -> {input_port_id}p already exists, skipping.");
                 continue;
             }
 
@@ -264,18 +261,13 @@ impl Store {
 
             match core.create_object::<pipewire::link::Link>("link-factory", &props) {
                 Ok(_) => {
-                    debug!(
-                        "Sent command to create link: {}p -> {}p",
-                        output_port_id, input_port_id
-                    );
+                    debug!("Sent command to create link: {output_port_id}p -> {input_port_id}p");
                     created_count += 1;
                 }
                 Err(e) => {
-                    let err_msg = format!(
-                        "Failed to create link {}p -> {}p: {}",
-                        output_port_id, input_port_id, e
-                    );
-                    error!("{}", err_msg);
+                    let err_msg =
+                        format!("Failed to create link {output_port_id}p -> {input_port_id}p: {e}");
+                    error!("{err_msg}");
                     if first_error.is_none() {
                         first_error = Some(anyhow!(err_msg));
                     }
@@ -285,8 +277,7 @@ impl Store {
 
         if let Some(err) = first_error {
             Err(err.context(format!(
-                "Encountered error creating links between {} and {}",
-                output_node_id, input_node_id
+                "Encountered error creating links between {output_node_id} and {input_node_id}"
             )))
         } else if created_count == 0 {
             Err(anyhow!(
@@ -296,8 +287,7 @@ impl Store {
             ))
         } else {
             debug!(
-                "Sent commands to create {} links between nodes {} and {}",
-                created_count, output_node_id, input_node_id
+                "Sent commands to create {created_count} links between nodes {output_node_id} and {input_node_id}"
             );
             Ok(())
         }
@@ -327,10 +317,7 @@ impl Store {
             .collect();
 
         if links_to_remove_ids.is_empty() {
-            debug!(
-                "No links found to remove between nodes {} and {}",
-                output_node_id, input_node_id
-            );
+            debug!("No links found to remove between nodes {output_node_id} and {input_node_id}");
             return Ok(());
         }
 
@@ -348,29 +335,23 @@ impl Store {
 
                 match core.destroy_object(link_internal.proxy) {
                     Ok(_) => {
-                        debug!("Sent command to destroy link object {}", link_id);
+                        debug!("Sent command to destroy link object {link_id}");
                         removed_count += 1;
                     }
                     Err(e) => {
-                        let err_msg = format!("Failed to destroy link object {}: {}", link_id, e);
-                        error!("{}", err_msg);
+                        let err_msg = format!("Failed to destroy link object {link_id}: {e}");
+                        error!("{err_msg}");
                         if first_error.is_none() {
                             first_error = Some(anyhow!(err_msg));
                         }
                     }
                 }
             } else {
-                warn!(
-                    "Link {} was already removed internally before destroy command.",
-                    link_id
-                );
+                warn!("Link {link_id} was already removed internally before destroy command.");
             }
         }
 
-        debug!(
-            "Attempted to remove {} links between nodes {} and {}",
-            removed_count, output_node_id, input_node_id
-        );
+        debug!("Attempted to remove {removed_count} links between nodes {output_node_id} and {input_node_id}");
         if let Some(err) = first_error {
             Err(err)
         } else {

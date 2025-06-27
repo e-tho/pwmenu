@@ -304,10 +304,7 @@ impl Store {
                                     store_borrow.handle_device_parameter(device_id, param_type, pod)
                                 }
                                 Err(e) => {
-                                    error!(
-                                        "Failed to borrow store for device {}: {}",
-                                        device_id, e
-                                    );
+                                    error!("Failed to borrow store for device {device_id}: {e}");
                                     return;
                                 }
                             };
@@ -358,10 +355,7 @@ impl Store {
                                 }
                             }
                             Err(e) => {
-                                error!(
-                                    "Failed to borrow store for device info {}: {}",
-                                    device_id, e
-                                );
+                                error!("Failed to borrow store for device info {device_id}: {e}");
                                 false
                             }
                         };
@@ -660,10 +654,7 @@ impl Store {
                         );
                         return Ok(true);
                     } else {
-                        debug!(
-                            "Device {} profile unchanged: index {}",
-                            device_id, new_index
-                        );
+                        debug!("Device {device_id} profile unchanged: index {new_index}");
                     }
                 }
             }

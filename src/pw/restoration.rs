@@ -100,10 +100,7 @@ impl RestorationManager {
             target_profile_index,
         );
 
-        debug!(
-            "Capturing USB defaults for {}: sink={}, source={}",
-            device_name, had_default_sink, had_default_source
-        );
+        debug!("Capturing USB defaults for {device_name}: sink={had_default_sink}, source={had_default_source}");
 
         self.pending.insert(device_name, restoration);
     }
@@ -137,10 +134,10 @@ impl RestorationManager {
 
         for (device_name, restoration) in &mut self.pending {
             if restoration.is_expired() {
-                debug!("Restoration expired for device {}", device_name);
+                debug!("Restoration expired for device {device_name}");
                 to_remove.push(device_name.clone());
             } else if restoration.max_attempts_reached() {
-                debug!("Max attempts reached for device {}", device_name);
+                debug!("Max attempts reached for device {device_name}");
                 to_remove.push(device_name.clone());
             } else {
                 restoration.increment_attempt();
@@ -155,7 +152,7 @@ impl RestorationManager {
     pub fn mark_completed(&mut self, device_names: &[String]) {
         for device_name in device_names {
             if self.pending.remove(device_name).is_some() {
-                debug!("Successfully restored defaults for device {}", device_name);
+                debug!("Successfully restored defaults for device {device_name}",);
             }
         }
     }
@@ -222,7 +219,7 @@ impl RestorationManager {
     pub fn cleanup_expired(&mut self) {
         self.pending.retain(|device_name, restoration| {
             if restoration.is_expired() {
-                debug!("Removing expired restoration for device {}", device_name);
+                debug!("Removing expired restoration for device {device_name}",);
                 false
             } else {
                 true

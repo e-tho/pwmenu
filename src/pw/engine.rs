@@ -26,7 +26,7 @@ impl PwEngine {
         let join_handle = tokio::task::spawn_blocking(move || {
             info!("PipeWire blocking thread started.");
             if let Err(e) = run_pipewire_loop(cmd_rx, graph_tx) {
-                error!("PipeWire loop exited with error: {:?}", e);
+                error!("PipeWire loop exited with error: {e:?}");
             } else {
                 info!("PipeWire loop exited cleanly.");
             }
@@ -266,7 +266,7 @@ fn run_pipewire_loop(
                                         }
                                     }
                                     Err(e) => {
-                                        error!("Failed to bind to metadata object: {}", e);
+                                        error!("Failed to bind to metadata object: {e}");
                                     }
                                 }
                             }
@@ -276,7 +276,7 @@ fn run_pipewire_loop(
                     let result = match store_rc.try_borrow_mut() {
                         Ok(mut store) => store.add_object(&registry, global, &store_rc, &graph_tx),
                         Err(e) => {
-                            error!("Failed to borrow store: {}", e);
+                            error!("Failed to borrow store: {e}");
                             Ok(false)
                         }
                     };
@@ -296,7 +296,7 @@ fn run_pipewire_loop(
                 let graph_tx = graph_tx_clone.clone();
 
                 move |id| {
-                    debug!("Registry: Global remove event: id {}", id);
+                    debug!("Registry: Global remove event: id {id}");
                     if let Ok(mut store) = store_rc.try_borrow_mut() {
                         store.remove_object(id);
                     }
@@ -322,10 +322,7 @@ fn run_pipewire_loop(
                 let store = store_clone.clone();
                 let graph_tx = graph_tx_clone.clone();
                 move |id, seq, res, message| {
-                    error!(
-                        "PipeWire Core Error: id {}, seq {}, res {}: {}",
-                        id, seq, res, message
-                    );
+                    error!("PipeWire Core Error: id {id}, seq {seq}, res {res}: {message}");
                     store.borrow_mut().connection_status = ConnectionStatus::Error;
                     update_graph(&store, &graph_tx);
                     mainloop_clone_err.quit();
@@ -371,7 +368,7 @@ fn run_pipewire_loop(
 
         match cmd_rx.try_recv() {
             Ok(cmd) => {
-                debug!("Received command: {:?}", cmd);
+                debug!("Received command: {cmd:?}");
 
                 if matches!(cmd, PwCommand::Exit) {
                     info!("Exit command received. Quitting PipeWire loop.");
@@ -513,7 +510,7 @@ impl Store {
 
     pub fn remove_object(&mut self, id: u32) {
         if self.devices.remove(&id).is_some() {
-            debug!("Removed device {}", id);
+            debug!("Removed device {id}");
         } else if let Some(node) = self.nodes.remove(&id) {
             debug!("Removed node {}: '{}'", id, node.name);
             if self.default_sink == Some(id) {
@@ -547,11 +544,11 @@ impl Store {
                     }
                 }
                 if self.links.remove(&link_id).is_some() {
-                    debug!("Cascaded removal of link {} due to port removal", link_id);
+                    debug!("Cascaded removal of link {link_id} due to port removal");
                 }
             }
         } else if let Some(removed_link) = self.links.remove(&id) {
-            debug!("Removed link {}", id);
+            debug!("Removed link {id}");
             if let Some(port) = self.ports.get_mut(&removed_link.output_port) {
                 port.links.retain(|&l_id| l_id != id);
             }

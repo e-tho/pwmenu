@@ -54,8 +54,7 @@ impl MetadataManager {
             .add_listener_local()
             .property(move |subject, key, type_, value| {
                 debug!(
-                    "Metadata property callback - subject: {}, key: {:?}, type: {:?}, value: {:?}",
-                    subject, key, type_, value
+                    "Metadata property callback - subject: {subject}, key: {key:?}, type: {type_:?}, value: {value:?}",
                 );
 
                 if subject != GLOBAL_SUBJECT_ID {
@@ -71,10 +70,10 @@ impl MetadataManager {
                     properties_clone
                         .borrow_mut()
                         .insert(key_str.to_string(), value_str.to_string());
-                    debug!("Cached metadata property: {} = {}", key_str, value_str);
+                    debug!("Cached metadata property: {key_str} = {value_str}");
                 } else {
                     properties_clone.borrow_mut().remove(key_str);
-                    debug!("Removed metadata property: {}", key_str);
+                    debug!("Removed metadata property: {key_str}");
                 }
 
                 // Trigger graph update for default audio device changes
@@ -123,9 +122,9 @@ impl MetadataManager {
             .as_ref()
             .ok_or_else(|| anyhow!("Default metadata object not found"))?;
 
-        let value = format!(r#"{{ "name": "{}" }}"#, node_name);
-        let property_key = format!("default.audio.{}", device_type);
-        let configured_key = format!("default.configured.audio.{}", device_type);
+        let value = format!(r#"{{ "name": "{node_name}" }}"#);
+        let property_key = format!("default.audio.{device_type}");
+        let configured_key = format!("default.configured.audio.{device_type}");
 
         // Set current default and persist setting for restart restoration
         metadata.set_property(
@@ -141,7 +140,7 @@ impl MetadataManager {
             Some(&value),
         );
 
-        debug!("Set default {} to {} in metadata", device_type, node_name);
+        debug!("Set default {device_type} to {node_name} in metadata");
         Ok(())
     }
 

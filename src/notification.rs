@@ -108,9 +108,9 @@ impl NotificationManager {
     ) -> Result<u32> {
         let icon_key = self.get_volume_notification_icon_key(node_type, volume_percent, is_muted);
 
-        let summary = format!("Volume: {}%", volume_percent);
+        let summary = format!("Volume: {volume_percent}%");
         let body = if is_muted {
-            format!("{} is muted", device_name)
+            format!("{device_name} is muted")
         } else {
             device_name.to_string()
         };
@@ -128,8 +128,8 @@ impl NotificationManager {
         } else {
             "input"
         };
-        let summary = format!("Default {} changed", device_type);
-        let body = format!("{} is now the default {}", device_name, device_type);
+        let summary = format!("Default {device_type} changed");
+        let body = format!("{device_name} is now the default {device_type}");
 
         self.send_notification(Some(summary), Some(body), Some(icon), None)
     }
