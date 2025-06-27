@@ -136,6 +136,10 @@ notifications:
       en: "Volume for %{device_name} set to %{volume}%"
       fr: "Volume pour %{device_name} défini à %{volume}%"
       de: "Lautstärke für %{device_name} auf %{volume}% gesetzt"
+    volume_set:
+      en: "Volume set to %{volume}%"
+      fr: "Volume défini à %{volume}%"
+      de: "Lautstärke auf %{volume}% gesetzt"
     device_muted:
       en: "%{device_name} muted"
       fr: "Son coupé pour %{device_name}"

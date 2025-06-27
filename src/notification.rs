@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use notify_rust::{Notification, NotificationHandle, Timeout};
+use notify_rust::{Hint, Notification, NotificationHandle, Timeout};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -10,6 +10,7 @@ use crate::{icons::Icons, pw::NodeType};
 pub struct NotificationManager {
     icons: Arc<Icons>,
     handles: Arc<Mutex<HashMap<u32, NotificationHandle>>>,
+    volume_notification_id: Arc<Mutex<Option<u32>>>,
 }
 
 impl NotificationManager {
@@ -17,6 +18,7 @@ impl NotificationManager {
         Self {
             icons,
             handles: Arc::new(Mutex::new(HashMap::new())),
+            volume_notification_id: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -107,15 +109,72 @@ impl NotificationManager {
         node_type: &NodeType,
     ) -> Result<u32> {
         let icon_key = self.get_volume_notification_icon_key(node_type, volume_percent, is_muted);
+        let icon_name = self.icons.get_xdg_icon(icon_key);
 
-        let summary = format!("Volume: {volume_percent}%");
-        let body = if is_muted {
-            format!("{device_name} is muted")
+        let summary = if is_muted {
+            rust_i18n::t!("notifications.pw.device_muted", device_name = device_name)
         } else {
-            device_name.to_string()
+            rust_i18n::t!("notifications.pw.volume_set", volume = volume_percent)
         };
 
-        self.send_notification(Some(summary), Some(body), Some(icon_key), None)
+        let body = device_name.to_string();
+
+        let volume_id = {
+            let mut volume_id_lock = self
+                .volume_notification_id
+                .lock()
+                .map_err(|e| anyhow!("Failed to acquire volume notification ID lock: {}", e))?;
+
+            if let Some(existing_id) = *volume_id_lock {
+                existing_id
+            } else {
+                let initial_notification = Notification::new()
+                    .summary(&summary)
+                    .body(&body)
+                    .icon(&icon_name)
+                    .timeout(Timeout::Milliseconds(3000))
+                    .hint(Hint::Transient(true))
+                    .hint(Hint::Category("progress".to_string()))
+                    .hint(Hint::CustomInt(
+                        "value".to_string(),
+                        volume_percent.clamp(0, 100) as i32,
+                    ))
+                    .show()?;
+
+                let new_id = initial_notification.id();
+                *volume_id_lock = Some(new_id);
+
+                let mut handles = self
+                    .handles
+                    .lock()
+                    .map_err(|e| anyhow!("Failed to acquire handles lock: {}", e))?;
+                handles.insert(new_id, initial_notification);
+
+                return Ok(new_id);
+            }
+        };
+
+        let notification = Notification::new()
+            .id(volume_id)
+            .summary(&summary)
+            .body(&body)
+            .icon(&icon_name)
+            .timeout(Timeout::Milliseconds(3000))
+            .hint(Hint::Transient(true))
+            .hint(Hint::Category("progress".to_string()))
+            .hint(Hint::CustomInt(
+                "value".to_string(),
+                volume_percent.clamp(0, 100) as i32,
+            ))
+            .show()?;
+
+        let mut handles = self
+            .handles
+            .lock()
+            .map_err(|e| anyhow!("Failed to acquire handles lock: {}", e))?;
+        handles.insert(volume_id, notification);
+
+        Ok(volume_id)
     }
 
     pub fn send_default_changed_notification(
