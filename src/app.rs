@@ -7,6 +7,7 @@ use crate::{
     notification::NotificationManager,
     pw::{controller::Controller, nodes::Node, Profile},
 };
+use anyhow::anyhow;
 use anyhow::Result;
 use rust_i18n::t;
 use std::sync::Arc;
@@ -613,13 +614,22 @@ impl App {
     }
 
     async fn perform_volume_change(&self, node: &Node, delta: f32) -> Result<()> {
-        let current = node.volume.linear;
+        let node_id = node.id;
+        let current_node = self
+            .controller
+            .get_node(node.id)
+            .ok_or_else(|| anyhow!("Node {node_id} not found"))?;
+
+        let current = current_node.volume.linear;
         let new_volume = (current + delta).clamp(0.0, 1.0);
 
         self.controller.set_volume(node.id, new_volume).await?;
 
         let volume_percent = (new_volume * 100.0).round() as u8;
-        let display_name = node.description.as_ref().unwrap_or(&node.name);
+        let display_name = current_node
+            .description
+            .as_ref()
+            .unwrap_or(&current_node.name);
 
         let msg = t!(
             "notifications.pw.volume_changed",
@@ -631,8 +641,8 @@ impl App {
         self.notification_manager.send_volume_notification(
             display_name,
             volume_percent,
-            node.volume.muted,
-            &node.node_type,
+            current_node.volume.muted,
+            &current_node.node_type,
         )?;
 
         Ok(())
