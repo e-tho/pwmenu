@@ -279,22 +279,6 @@ impl Store {
         if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
             for prop in &obj.properties {
                 match prop.key {
-                    libspa::sys::SPA_PROP_volume => {
-                        if let Value::Float(volume) = prop.value {
-                            if (node.volume - volume).abs() > 0.001 {
-                                node.volume = volume;
-                                updated = true;
-                            }
-                        }
-                    }
-                    libspa::sys::SPA_PROP_mute => {
-                        if let Value::Bool(mute) = prop.value {
-                            if node.muted != mute {
-                                node.muted = mute;
-                                updated = true;
-                            }
-                        }
-                    }
                     libspa::sys::SPA_PROP_channelVolumes => {
                         if let Some(raw_volume) =
                             VolumeResolver::extract_channel_volume(&prop.value)
@@ -302,6 +286,24 @@ impl Store {
                             let scaled_volume = VolumeResolver::apply_cubic_scaling(raw_volume);
                             if (node.volume - scaled_volume).abs() > 0.001 {
                                 node.volume = scaled_volume;
+                                updated = true;
+                            }
+                        }
+                    }
+                    libspa::sys::SPA_PROP_volume => {
+                        if !updated {
+                            if let Value::Float(volume) = prop.value {
+                                if (node.volume - volume).abs() > 0.001 {
+                                    node.volume = volume;
+                                    updated = true;
+                                }
+                            }
+                        }
+                    }
+                    libspa::sys::SPA_PROP_mute => {
+                        if let Value::Bool(mute) = prop.value {
+                            if node.muted != mute {
+                                node.muted = mute;
                                 updated = true;
                             }
                         }
