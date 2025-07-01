@@ -124,10 +124,9 @@ impl DeviceInternal {
         let target_profile = self.profiles.iter().find(|p| p.index == profile_index);
         if let Some(profile) = target_profile {
             debug!(
-                "Switching device {} from profile {} to profile {}: '{}' ({})",
+                "Switching device {} from profile {} to profile {profile_index}: '{}' ({})",
                 self.id,
                 self.current_profile_index.unwrap_or(999),
-                profile_index,
                 profile.name,
                 profile.description
             );
@@ -395,7 +394,7 @@ impl Store {
         let device = self
             .devices
             .get_mut(&device_id)
-            .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
+            .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
         if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
             let mut route_direction: Option<u32> = None;
@@ -509,7 +508,7 @@ impl Store {
         let device = self
             .devices
             .get_mut(&device_id)
-            .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
+            .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
         if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
             let mut updated = false;
@@ -585,7 +584,7 @@ impl Store {
         let device = self
             .devices
             .get_mut(&device_id)
-            .ok_or_else(|| anyhow!("Device {} not found for profile list update", device_id))?;
+            .ok_or_else(|| anyhow!("Device {device_id} not found for profile list update"))?;
 
         debug!(
             "Updated profile {} for device {}: '{}' ({}) - available: {}",
@@ -613,13 +612,13 @@ impl Store {
         let device = self
             .devices
             .get_mut(&device_id)
-            .ok_or_else(|| anyhow!("Device {} not found for current profile update", device_id))?;
+            .ok_or_else(|| anyhow!("Device {device_id} not found for current profile update"))?;
 
         let (_, value) = PodDeserializer::deserialize_any_from(pod.as_bytes())
-            .map_err(|e| anyhow!("Failed to deserialize current profile pod: {:?}", e))?;
+            .map_err(|e| anyhow!("Failed to deserialize current profile pod: {e:?}"))?;
 
         let Value::Object(obj) = value else {
-            return Err(anyhow!("Expected Object value, got {:?}", value));
+            return Err(anyhow!("Expected Object value, got {value:?}"));
         };
 
         for prop in &obj.properties {
@@ -627,7 +626,7 @@ impl Store {
             if prop.key == SPA_PARAM_PROFILE_index {
                 if let Value::Int(index) = prop.value {
                     if index < 0 {
-                        return Err(anyhow!("Invalid negative profile index: {}", index));
+                        return Err(anyhow!("Invalid negative profile index: {index}"));
                     }
 
                     let new_index = index as u32;
@@ -665,10 +664,10 @@ impl Store {
 
     fn parse_profile_from_pod(pod: &Pod) -> Result<Profile> {
         let (_, value) = PodDeserializer::deserialize_any_from(pod.as_bytes())
-            .map_err(|e| anyhow!("Failed to deserialize profile pod: {:?}", e))?;
+            .map_err(|e| anyhow!("Failed to deserialize profile pod: {e:?}"))?;
 
         let Value::Object(obj) = value else {
-            return Err(anyhow!("Expected Object value, got {:?}", value));
+            return Err(anyhow!("Expected Object value, got {value:?}"));
         };
 
         let mut profile = Profile {
@@ -685,7 +684,7 @@ impl Store {
                 SPA_PARAM_PROFILE_index => {
                     if let Value::Int(index) = prop.value {
                         if index < 0 {
-                            return Err(anyhow!("Invalid negative profile index: {}", index));
+                            return Err(anyhow!("Invalid negative profile index: {index}"));
                         }
                         profile.index = index as u32;
                     }
@@ -703,7 +702,7 @@ impl Store {
                 SPA_PARAM_PROFILE_priority => {
                     if let Value::Int(priority) = prop.value {
                         if priority < 0 {
-                            return Err(anyhow!("Invalid negative profile priority: {}", priority));
+                            return Err(anyhow!("Invalid negative profile priority: {priority}"));
                         }
                         profile.priority = priority as u32;
                     }
@@ -744,7 +743,7 @@ impl Store {
         let device = self
             .devices
             .get(&device_id)
-            .ok_or_else(|| anyhow!("Device {} not found for profile switch", device_id))?;
+            .ok_or_else(|| anyhow!("Device {device_id} not found for profile switch"))?;
 
         device.switch_profile(profile_index)
     }
@@ -854,7 +853,7 @@ impl Store {
         let device = self
             .devices
             .get(&device_id)
-            .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
+            .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
         let effective_device_type = self.determine_effective_device_type(device)?;
         let (route_index, route_device) = self.get_route_info(device, effective_device_type)?;
@@ -890,7 +889,7 @@ impl Store {
         let device = self
             .devices
             .get(&device_id)
-            .ok_or_else(|| anyhow!("Device {} not found", device_id))?;
+            .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
         let effective_device_type = self.determine_effective_device_type(device)?;
         let (route_index, route_device) = self.get_route_info(device, effective_device_type)?;

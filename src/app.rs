@@ -442,7 +442,7 @@ impl App {
         } else {
             try_send_log!(
                 self.log_sender,
-                format!("Exited profile menu for {}", device_name)
+                format!("Exited profile menu for {device_name}")
             );
             Ok(false)
         }

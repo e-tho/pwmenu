@@ -218,7 +218,7 @@ impl Controller {
         let node = graph
             .nodes
             .get(&node_id)
-            .ok_or_else(|| anyhow!("Node {} not found", node_id))?;
+            .ok_or_else(|| anyhow!("Node {node_id} not found"))?;
 
         // Try device-level control first, fall back to node-level
         let result = if let Some(device_id) = node.device_id {
@@ -253,7 +253,7 @@ impl Controller {
         let node = graph
             .nodes
             .get(&node_id)
-            .ok_or_else(|| anyhow!("Node {} not found", node_id))?;
+            .ok_or_else(|| anyhow!("Node {node_id} not found"))?;
 
         // Try device-level control first, fall back to node-level
         let result = if let Some(device_id) = node.device_id {
@@ -293,7 +293,7 @@ impl Controller {
 
             try_send_log!(
                 self.log_sender,
-                format!("Created link from {} to {}", output_name, input_name)
+                format!("Created link from {output_name} to {input_name}")
             );
         }
 
@@ -310,7 +310,7 @@ impl Controller {
 
             try_send_log!(
                 self.log_sender,
-                format!("Removed link from {} to {}", output_name, input_name)
+                format!("Removed link from {output_name} to {input_name}")
             );
         }
 

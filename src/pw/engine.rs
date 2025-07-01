@@ -94,11 +94,11 @@ impl PwEngine {
 
         self.cmd_tx
             .send(command)
-            .map_err(|e| anyhow!("PipeWire thread command channel closed: {}", e))?;
+            .map_err(|e| anyhow!("PipeWire thread command channel closed: {e}"))?;
 
         result_rx
             .await
-            .map_err(|e| anyhow!("PipeWire thread result channel closed: {}", e))?
+            .map_err(|e| anyhow!("PipeWire thread result channel closed: {e}"))?
             .context("PipeWire command execution failed")
     }
 

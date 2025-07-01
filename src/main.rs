@@ -131,14 +131,14 @@ async fn run_app_loop(
                 app.run_input_menu(menu, command_str, icon_type, spaces)
                     .await
             }
-            _ => Err(anyhow!("Invalid menu value: {}", menu_name)),
+            _ => Err(anyhow!("Invalid menu value: {menu_name}")),
         }
     } else {
         app.run(menu, command_str, icon_type, spaces).await
     };
 
     if let Err(err) = result {
-        return Err(anyhow!("Fatal error in application: {}", err));
+        return Err(anyhow!("Fatal error in application: {err}"));
     }
 
     Ok(())

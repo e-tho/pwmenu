@@ -201,11 +201,11 @@ impl Store {
         let output_node = self
             .nodes
             .get(&output_node_id)
-            .ok_or_else(|| anyhow!("Output node {} not found for create_link", output_node_id))?;
+            .ok_or_else(|| anyhow!("Output node {output_node_id} not found for create_link"))?;
         let input_node = self
             .nodes
             .get(&input_node_id)
-            .ok_or_else(|| anyhow!("Input node {} not found for create_link", input_node_id))?;
+            .ok_or_else(|| anyhow!("Input node {input_node_id} not found for create_link"))?;
 
         let output_ports: Vec<&PortInternal> = output_node
             .ports
@@ -214,10 +214,7 @@ impl Store {
             .filter(|p| p.direction == PortDirection::Output)
             .collect();
         if output_ports.is_empty() {
-            return Err(anyhow!(
-                "Output node {} has no output ports",
-                output_node_id
-            ));
+            return Err(anyhow!("Output node {output_node_id} has no output ports"));
         }
 
         let input_ports: Vec<&PortInternal> = input_node
@@ -227,16 +224,14 @@ impl Store {
             .filter(|p| p.direction == PortDirection::Input)
             .collect();
         if input_ports.is_empty() {
-            return Err(anyhow!("Input node {} has no input ports", input_node_id));
+            return Err(anyhow!("Input node {input_node_id} has no input ports"));
         }
 
         let core = self.core.clone();
         let port_pairs = map_ports(&output_ports, &input_ports);
         if port_pairs.is_empty() {
             return Err(anyhow!(
-                "No matching ports found between nodes {} and {}",
-                output_node_id,
-                input_node_id
+                "No matching ports found between nodes {output_node_id} and {input_node_id}",
             ));
         }
 
@@ -281,9 +276,7 @@ impl Store {
             )))
         } else if created_count == 0 {
             Err(anyhow!(
-                "No new links were created between {} and {} (they might already exist).",
-                output_node_id,
-                input_node_id
+                "No new links were created between {output_node_id} and {input_node_id} (they might already exist).",
             ))
         } else {
             debug!(
@@ -296,14 +289,12 @@ impl Store {
     pub fn remove_link(&mut self, output_node_id: u32, input_node_id: u32) -> Result<()> {
         if !self.nodes.contains_key(&output_node_id) {
             return Err(anyhow!(
-                "Output node {} not found for remove_link",
-                output_node_id
+                "Output node {output_node_id} not found for remove_link"
             ));
         }
         if !self.nodes.contains_key(&input_node_id) {
             return Err(anyhow!(
-                "Input node {} not found for remove_link",
-                input_node_id
+                "Input node {input_node_id} not found for remove_link",
             ));
         }
 

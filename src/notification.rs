@@ -48,7 +48,7 @@ impl NotificationManager {
         let mut handles = self
             .handles
             .lock()
-            .map_err(|e| anyhow!("Failed to acquire lock on notification handles: {}", e))?;
+            .map_err(|e| anyhow!("Failed to acquire lock on notification handles: {e}"))?;
         handles.insert(id, handle);
 
         Ok(id)
@@ -58,13 +58,13 @@ impl NotificationManager {
         let mut handles = self
             .handles
             .lock()
-            .map_err(|e| anyhow!("Failed to acquire lock on notification handles: {}", e))?;
+            .map_err(|e| anyhow!("Failed to acquire lock on notification handles: {e}"))?;
 
         if let Some(handle) = handles.remove(&id) {
             handle.close();
             Ok(())
         } else {
-            Err(anyhow!("Notification ID {} not found", id))
+            Err(anyhow!("Notification ID {id} not found"))
         }
     }
 
@@ -123,7 +123,7 @@ impl NotificationManager {
             let mut volume_id_lock = self
                 .volume_notification_id
                 .lock()
-                .map_err(|e| anyhow!("Failed to acquire volume notification ID lock: {}", e))?;
+                .map_err(|e| anyhow!("Failed to acquire volume notification ID lock: {e}"))?;
 
             if let Some(existing_id) = *volume_id_lock {
                 existing_id
@@ -147,7 +147,7 @@ impl NotificationManager {
                 let mut handles = self
                     .handles
                     .lock()
-                    .map_err(|e| anyhow!("Failed to acquire handles lock: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to acquire handles lock: {e}"))?;
                 handles.insert(new_id, initial_notification);
 
                 return Ok(new_id);
@@ -171,7 +171,7 @@ impl NotificationManager {
         let mut handles = self
             .handles
             .lock()
-            .map_err(|e| anyhow!("Failed to acquire handles lock: {}", e))?;
+            .map_err(|e| anyhow!("Failed to acquire handles lock: {e}"))?;
         handles.insert(volume_id, notification);
 
         Ok(volume_id)

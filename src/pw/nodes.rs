@@ -319,7 +319,7 @@ impl Store {
         let node = self
             .nodes
             .get_mut(&node_id)
-            .ok_or_else(|| anyhow!("Node {} not found for set_node_volume", node_id))?;
+            .ok_or_else(|| anyhow!("Node {node_id} not found for set_node_volume"))?;
 
         let volume_value = volume.clamp(0.0, 1.0);
 
@@ -355,7 +355,7 @@ impl Store {
         let node = self
             .nodes
             .get_mut(&node_id)
-            .ok_or_else(|| anyhow!("Node {} not found for set_node_mute", node_id))?;
+            .ok_or_else(|| anyhow!("Node {node_id} not found for set_node_mute"))?;
 
         let mut buffer: Vec<u8> = Vec::new();
         let mut builder = Builder::new(&mut buffer);
@@ -389,10 +389,10 @@ impl Store {
         let node = self
             .nodes
             .get(&node_id)
-            .ok_or_else(|| anyhow!("Node {} not found for set_default_sink", node_id))?;
+            .ok_or_else(|| anyhow!("Node {node_id} not found for set_default_sink"))?;
 
         if node.node_type != NodeType::Sink {
-            return Err(anyhow!("Node {} is not a Sink", node_id));
+            return Err(anyhow!("Node {node_id} is not a Sink"));
         }
         if self.default_sink == Some(node_id) {
             return Ok(());
@@ -432,10 +432,10 @@ impl Store {
         let node = self
             .nodes
             .get(&node_id)
-            .ok_or_else(|| anyhow!("Node {} not found for set_default_source", node_id))?;
+            .ok_or_else(|| anyhow!("Node {node_id} not found for set_default_source"))?;
 
         if node.node_type != NodeType::Source {
-            return Err(anyhow!("Node {} is not a Source", node_id));
+            return Err(anyhow!("Node {node_id} is not a Source"));
         }
         if self.default_source == Some(node_id) {
             return Ok(());
