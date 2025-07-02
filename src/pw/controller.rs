@@ -439,4 +439,43 @@ impl Controller {
             .unwrap_or(&node.name)
             .to_string()
     }
+
+    pub fn get_node_port_number(&self, node: &Node) -> Option<usize> {
+        let nodes_of_same_type = if matches!(node.node_type, NodeType::Sink | NodeType::Duplex) {
+            self.get_output_nodes()
+        } else {
+            self.get_input_nodes()
+        }
+        .into_iter()
+        .filter(|n| n.device_id == node.device_id)
+        .collect::<Vec<_>>();
+
+        if nodes_of_same_type.len() <= 1 {
+            return None;
+        }
+
+        let graph = self.engine.graph();
+        let node_ports = graph
+            .ports
+            .values()
+            .filter(|p| p.node_id == node.id)
+            .collect::<Vec<_>>();
+
+        if node_ports.is_empty() {
+            return None;
+        }
+
+        let mut all_ports = nodes_of_same_type
+            .iter()
+            .flat_map(|n| graph.ports.values().filter(|p| p.node_id == n.id))
+            .collect::<Vec<_>>();
+
+        all_ports.sort_by(|a, b| a.id.cmp(&b.id));
+
+        if let Some(pos) = all_ports.iter().position(|p| p.id == node_ports[0].id) {
+            return Some(pos + 1);
+        }
+
+        None
+    }
 }

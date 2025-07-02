@@ -240,6 +240,10 @@ impl Menu {
             display_name = format!("{display_name} ({app_name})");
         }
 
+        if let Some(port_number) = controller.get_node_port_number(node) {
+            display_name.push_str(&format!(" - {port_number}"));
+        }
+
         let volume_str = format!(" [{}%]", node.volume.percent());
         display_name.push_str(&volume_str);
 
