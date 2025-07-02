@@ -38,6 +38,7 @@ enum BusPriority {
 
 #[derive(Debug, Clone)]
 pub struct DeviceInfo {
+    pub nick: Option<String>,
     pub form_factor: Option<String>,
     pub bus: Option<String>,
     pub media_class: Option<String>,
@@ -357,6 +358,7 @@ impl Controller {
 
     pub fn get_device_info(&self, node: &Node) -> DeviceInfo {
         let mut device_info = DeviceInfo {
+            nick: None,
             form_factor: None,
             bus: None,
             media_class: node.media_class.clone(),
@@ -367,6 +369,7 @@ impl Controller {
         if let Some(device_id) = node.device_id {
             let graph = self.engine.graph();
             if let Some(device) = graph.devices.get(&device_id) {
+                device_info.nick = device.nick.clone();
                 device_info.form_factor = device.form_factor.clone();
                 device_info.bus = device.bus.clone();
             }
@@ -426,5 +429,14 @@ impl Controller {
         }
 
         result
+    }
+
+    pub fn get_node_base_name(&self, node: &Node) -> String {
+        self.get_device_info(node)
+            .nick
+            .as_ref()
+            .or(node.description.as_ref())
+            .unwrap_or(&node.name)
+            .to_string()
     }
 }

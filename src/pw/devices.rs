@@ -60,6 +60,7 @@ fn get_device_form_factor(props: &DictRef) -> Option<&str> {
 pub struct Device {
     pub id: u32,
     pub name: String,
+    pub nick: Option<String>,
     pub description: Option<String>,
     pub device_type: DeviceType,
     pub bus: Option<String>,
@@ -74,6 +75,7 @@ pub struct Device {
 pub struct DeviceInternal {
     pub id: u32,
     pub name: String,
+    pub nick: Option<String>,
     pub description: Option<String>,
     pub device_type: DeviceType,
     pub bus: Option<String>,
@@ -96,6 +98,7 @@ impl DeviceInternal {
         Device {
             id: self.id,
             name: self.name.clone(),
+            nick: self.nick.clone(),
             description: self.description.clone(),
             device_type: self.device_type,
             bus: self.bus.clone(),
@@ -211,13 +214,14 @@ impl Store {
             .bind::<pipewire::device::Device, &DictRef>(global)
             .with_context(|| format!("Failed to bind device {}", global.id))?;
 
+        let nick = props.get(*DEVICE_NICK).map(str::to_string);
+        let description = props.get(*DEVICE_DESCRIPTION).map(str::to_string);
         let name = props
             .get(*DEVICE_NAME)
-            .or_else(|| props.get(*DEVICE_NICK))
-            .or_else(|| props.get(*DEVICE_DESCRIPTION))
+            .or(nick.as_deref())
+            .or(description.as_deref())
             .unwrap_or("Unknown Device")
             .to_string();
-        let description = props.get(*DEVICE_DESCRIPTION).map(str::to_string);
         let device_type = match props.get(*MEDIA_CLASS) {
             Some("Audio/Device/Sink") | Some("Audio/Sink") => DeviceType::Sink,
             Some("Audio/Device/Source") | Some("Audio/Source") => DeviceType::Source,
@@ -227,6 +231,7 @@ impl Store {
         let mut device = DeviceInternal {
             id: global.id,
             name: name.clone(),
+            nick,
             description,
             device_type,
             bus: None,

@@ -234,7 +234,7 @@ impl Menu {
         icon_type: &str,
         spaces: usize,
     ) -> String {
-        let mut display_name = node.description.as_ref().unwrap_or(&node.name).clone();
+        let mut display_name = controller.get_node_base_name(node);
 
         if let Some(app_name) = &node.application_name {
             display_name = format!("{display_name} ({app_name})");
