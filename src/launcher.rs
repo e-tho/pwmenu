@@ -1,16 +1,22 @@
 use anyhow::{anyhow, Context, Result};
 use clap::ArgEnum;
-use nix::unistd::Pid;
 use nix::{
     libc,
-    sys::signal::{killpg, Signal},
+    sys::signal::{kill, killpg, Signal},
+    unistd::Pid,
 };
 use process_wrap::std::{ProcessGroup, StdCommandWrap};
 use shlex::Shlex;
 use signal_hook::iterator::Signals;
-use std::io::Write;
-use std::process::{Command, Stdio};
-use std::thread;
+use std::{
+    io::Write,
+    process::{exit, Command, Stdio},
+    sync::{
+        atomic::{AtomicI32, Ordering},
+        Once,
+    },
+    thread,
+};
 
 #[derive(Debug, Clone, ArgEnum)]
 pub enum LauncherType {
@@ -42,6 +48,9 @@ pub enum LauncherCommand {
         args: Vec<(String, String)>,
     },
 }
+
+static CURRENT_LAUNCHER_PID: AtomicI32 = AtomicI32::new(-1);
+static SIGNAL_HANDLER_INIT: Once = Once::new();
 
 pub struct Launcher;
 
@@ -127,12 +136,21 @@ impl Launcher {
             .context("Failed to spawn launcher command")?;
 
         let pid = child.id() as i32;
-        thread::spawn(move || {
-            let mut signals = Signals::new([libc::SIGTERM, libc::SIGINT]).unwrap();
-            for _signal in signals.forever() {
-                let _ = killpg(Pid::from_raw(pid), Signal::SIGTERM);
-            }
+
+        SIGNAL_HANDLER_INIT.call_once(|| {
+            thread::spawn(|| {
+                let mut signals = Signals::new([libc::SIGTERM, libc::SIGINT]).unwrap();
+                if let Some(_signal) = signals.forever().next() {
+                    let current_pid = CURRENT_LAUNCHER_PID.load(Ordering::Relaxed);
+                    if current_pid > 0 && kill(Pid::from_raw(current_pid), None).is_ok() {
+                        let _ = killpg(Pid::from_raw(current_pid), Signal::SIGTERM);
+                    }
+                    exit(0);
+                }
+            });
         });
+
+        CURRENT_LAUNCHER_PID.store(pid, Ordering::Relaxed);
 
         if let Some(input_data) = input {
             if let Some(stdin) = child.stdin().as_mut() {
@@ -142,6 +160,8 @@ impl Launcher {
 
         let output = child.wait_with_output()?;
         let trimmed_output = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        CURRENT_LAUNCHER_PID.store(-1, Ordering::Relaxed);
 
         if trimmed_output.is_empty() {
             Ok(None)
