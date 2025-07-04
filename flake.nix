@@ -60,7 +60,7 @@
           meta = {
             description = "Launcher-driven audio manager for Linux";
             homepage = "https://github.com/e-tho/pwmenu";
-            license = pkgs.lib.licenses.gpl3;
+            license = pkgs.lib.licenses.gpl3Plus;
             maintainers = [
               {
                 github = "e-tho";
