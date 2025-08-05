@@ -8,6 +8,17 @@ use tokio::sync::mpsc::unbounded_channel;
 
 i18n!("locales");
 
+fn validate_launcher_command(command: &str) -> Result<String, String> {
+    if command.contains("{placeholder}") {
+        eprintln!("WARNING: {{placeholder}} is deprecated. Use {{hint}} instead.");
+    }
+    if command.contains("{prompt}") {
+        eprintln!("WARNING: {{prompt}} is deprecated. Use {{hint}} instead.");
+    }
+
+    Ok(command.to_string())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -39,6 +50,7 @@ async fn main() -> Result<()> {
                 .long("launcher-command")
                 .takes_value(true)
                 .required_if_eq("launcher", "custom")
+                .value_parser(validate_launcher_command)
                 .help("Launcher command to use when --launcher is set to custom"),
         )
         .arg(

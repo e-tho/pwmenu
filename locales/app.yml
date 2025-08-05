@@ -14,7 +14,7 @@ menus:
           fr: "Périphériques d'entrée"
           de: "Eingabegeräte"
   output:
-    prompt:
+    hint:
       en: "Select Output Device"
       fr: "Sélectionner périphérique de sortie"
       de: "Ausgabegerät auswählen"
@@ -30,7 +30,7 @@ menus:
           fr: "Sélectionner périphérique de sortie"
           de: "Ausgabegerät auswählen"
   input:
-    prompt:
+    hint:
       en: "Select Input Device"
       fr: "Sélectionner périphérique d'entrée"
       de: "Eingabegerät auswählen"
@@ -46,7 +46,7 @@ menus:
           fr: "Sélectionner périphérique d'entrée"
           de: "Eingabegerät auswählen"
   device:
-    prompt:
+    hint:
       en: "Manage %{device_name}"
       fr: "Gérer %{device_name}"
       de: "%{device_name} verwalten"
@@ -67,12 +67,12 @@ menus:
           fr: "Ajuster le volume"
           de: "Lautstärke anpassen"
   profile:
-    prompt:
+    hint:
       en: "Switch profile for %{device_name}"
       fr: "Changer le profil de %{device_name}"
       de: "Profil für %{device_name} ändern"
   volume:
-    prompt:
+    hint:
       en: "%{device_name} [%{volume}%]"
       fr: "%{device_name} [%{volume}%]"
       de: "%{device_name} [%{volume}%]"

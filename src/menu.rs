@@ -173,15 +173,9 @@ impl Menu {
         launcher_command: &Option<String>,
         input: Option<&str>,
         icon_type: &str,
-        prompt: Option<&str>,
+        hint: Option<&str>,
     ) -> Result<Option<String>> {
-        let cmd = Launcher::create_command(
-            &self.launcher_type,
-            launcher_command,
-            icon_type,
-            prompt,
-            prompt,
-        )?;
+        let cmd = Launcher::create_command(&self.launcher_type, launcher_command, icon_type, hint)?;
 
         Launcher::run(cmd, input)
     }
@@ -313,9 +307,9 @@ impl Menu {
             input.push_str(&format!("\n{node_display}"));
         }
 
-        let prompt = t!("menus.output.prompt");
+        let hint = t!("menus.output.hint");
         let menu_output =
-            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&prompt))?;
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
 
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
@@ -349,9 +343,9 @@ impl Menu {
             input.push_str(&format!("\n{node_display}"));
         }
 
-        let prompt = t!("menus.input.prompt");
+        let hint = t!("menus.input.hint");
         let menu_output =
-            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&prompt))?;
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
 
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
@@ -396,10 +390,10 @@ impl Menu {
         options.push((volume_icon_key, DeviceMenuOptions::AdjustVolume.to_str()));
 
         let input = self.get_icon_text(options, icon_type, spaces);
-        let prompt = t!("menus.device.prompt", device_name = device_name);
+        let hint = t!("menus.device.hint", device_name = device_name);
 
         let menu_output =
-            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&prompt))?;
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
 
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
@@ -435,10 +429,10 @@ impl Menu {
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);
-        let prompt = t!("menus.profile.prompt", device_name = device_name);
+        let hint = t!("menus.profile.hint", device_name = device_name);
 
         let menu_output =
-            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&prompt))?;
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
 
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
@@ -506,14 +500,14 @@ impl Menu {
 
         let input = self.get_icon_text(options, icon_type, spaces);
         let volume_percent = node.volume.percent();
-        let prompt = t!(
-            "menus.volume.prompt",
+        let hint = t!(
+            "menus.volume.hint",
             device_name = node.description.as_ref().unwrap_or(&node.name),
             volume = volume_percent
         );
 
         let menu_output =
-            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&prompt))?;
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
 
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
