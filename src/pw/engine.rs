@@ -322,6 +322,10 @@ fn run_pipewire_loop(
                 let store = store_clone.clone();
                 let graph_tx = graph_tx_clone.clone();
                 move |id, seq, res, message| {
+                    if res == -2 && message.contains("enum params id:2") {
+                        debug!("PipeWire internal parameter enumeration failed: id {id}, seq {seq}: {message}");
+                        return;
+                    }
                     error!("PipeWire Core Error: id {id}, seq {seq}, res {res}: {message}");
                     store.borrow_mut().connection_status = ConnectionStatus::Error;
                     update_graph(&store, &graph_tx);
