@@ -383,16 +383,12 @@ impl Store {
         ]);
 
         // Initialize parameter enumeration
-        device
-            .proxy
-            .enum_params(0, Some(ParamType::Route), 0, u32::MAX);
-        device
-            .proxy
-            .enum_params(0, Some(ParamType::Props), 0, u32::MAX);
-        device
-            .proxy
-            .enum_params(0, Some(ParamType::EnumProfile), 0, u32::MAX);
-        device.proxy.enum_params(0, Some(ParamType::Profile), 0, 1);
+        device.proxy.subscribe_params(&[
+            ParamType::Route,
+            ParamType::Props,
+            ParamType::EnumProfile,
+            ParamType::Profile,
+        ]);
     }
 
     pub fn parse_route_volume_data(&mut self, device_id: u32, pod: &Pod) -> Result<bool> {

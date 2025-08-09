@@ -4,18 +4,27 @@ use pipewire::{
     core::Info as CoreInfo, main_loop::MainLoop, registry::GlobalObject, spa::utils::dict::DictRef,
     types::ObjectType,
 };
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 use tokio::sync::{mpsc, oneshot, watch};
 
 use crate::pw::{
     commands::PwCommand,
     graph::{update_graph, AudioGraph, ConnectionStatus, Store},
+    DeviceType,
 };
 
 pub struct PwEngine {
     cmd_tx: mpsc::UnboundedSender<PwCommand>,
     graph_rx: watch::Receiver<AudioGraph>,
     _join_handle: Option<tokio::task::JoinHandle<()>>,
+}
+
+fn objects_ready(graph: &AudioGraph) -> bool {
+    graph
+        .devices
+        .values()
+        .all(|d| !d.profiles.is_empty() || d.device_type == DeviceType::Unknown)
+        && graph.nodes.values().all(|n| n.volume.linear > 0.0)
 }
 
 impl PwEngine {
@@ -42,42 +51,53 @@ impl PwEngine {
     pub async fn wait_for_initialization(&self) -> Result<()> {
         let mut graph_rx = self.graph_rx.clone();
 
+        // Phase 1: Wait for registry sync
         loop {
             let graph = graph_rx.borrow().clone();
-
-            if graph.connection_status == crate::pw::ConnectionStatus::Connected
-                && graph.initial_sync_complete
+            if graph.connection_status == ConnectionStatus::Connected && graph.initial_sync_complete
             {
                 break;
             }
-
             if graph_rx.changed().await.is_err() {
-                return Err(anyhow!("Graph updates channel closed during init phase 1"));
+                return Err(anyhow!("Graph updates channel closed during registry sync"));
             }
         }
 
-        self.trigger_parameter_enumeration().await?;
+        // Phase 2: Wait for parameter population
+        self.ensure_parameter_population().await
+    }
+
+    async fn ensure_parameter_population(&self) -> Result<()> {
+        let mut graph_rx = self.graph_rx.clone();
+        let mut stable_count = 0;
+        let mut last_object_count = 0;
+        let mut attempt = 0;
+        let max_attempts = 6;
 
         loop {
             let graph = graph_rx.borrow().clone();
+            let current_count = graph.nodes.len() + graph.devices.len();
 
-            if graph.params_sync_complete {
+            if objects_ready(&graph) && current_count == last_object_count {
+                stable_count += 1;
+                if stable_count >= 2 {
+                    break;
+                }
+            } else {
+                stable_count = 0;
+            }
+
+            last_object_count = current_count;
+            attempt += 1;
+
+            if attempt >= max_attempts {
                 break;
             }
 
-            if graph_rx.changed().await.is_err() {
-                return Err(anyhow!("Graph updates channel closed during init phase 2"));
-            }
+            let timeout = Duration::from_millis(50 * attempt.min(6) as u64);
+            tokio::time::timeout(timeout, graph_rx.changed()).await.ok();
         }
-
         Ok(())
-    }
-
-    pub async fn trigger_parameter_enumeration(&self) -> Result<()> {
-        self.send_command_and_wait(|rs| PwCommand::TriggerParameterEnumeration {
-            result_sender: rs,
-        })
-        .await
     }
 
     pub fn graph(&self) -> AudioGraph {
@@ -381,9 +401,6 @@ fn run_pipewire_loop(
                 }
 
                 let cmd_processing_result = match cmd {
-                    PwCommand::TriggerParameterEnumeration { result_sender } => {
-                        result_sender.send(store.borrow_mut().trigger_parameter_enumeration())
-                    }
                     PwCommand::SetNodeVolume {
                         node_id,
                         volume,

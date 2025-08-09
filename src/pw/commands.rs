@@ -51,8 +51,5 @@ pub enum PwCommand {
         mute: bool,
         result_sender: oneshot::Sender<Result<()>>,
     },
-    TriggerParameterEnumeration {
-        result_sender: oneshot::Sender<Result<()>>,
-    },
     Exit,
 }

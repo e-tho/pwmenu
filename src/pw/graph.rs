@@ -6,7 +6,6 @@ use crate::pw::{
     restoration::RestorationManager,
 };
 use anyhow::Result;
-use libspa::param::ParamType;
 use log::{debug, error, info, warn};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use tokio::sync::watch;
@@ -124,37 +123,6 @@ impl Store {
         }
 
         debug!("Received sync done for untracked sequence: {seq}");
-    }
-
-    pub fn trigger_parameter_enumeration(&mut self) -> Result<()> {
-        debug!(
-            "Triggering parameter enumeration for {} devices and {} nodes",
-            self.devices.len(),
-            self.nodes.len()
-        );
-
-        for device in self.devices.values() {
-            device
-                .proxy
-                .enum_params(0, Some(ParamType::Route), 0, u32::MAX);
-            device
-                .proxy
-                .enum_params(0, Some(ParamType::Props), 0, u32::MAX);
-            device
-                .proxy
-                .enum_params(0, Some(ParamType::EnumProfile), 0, u32::MAX);
-            device.proxy.enum_params(0, Some(ParamType::Profile), 0, 1);
-        }
-
-        for node in self.nodes.values() {
-            node.proxy
-                .enum_params(0, Some(ParamType::Props), 0, u32::MAX);
-        }
-
-        let params_sync_seq = self.core.sync(0)?.seq();
-        self.params_sync_seq = Some(params_sync_seq);
-
-        Ok(())
     }
 
     pub fn setup_metadata_manager(

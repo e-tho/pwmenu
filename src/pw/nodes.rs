@@ -203,47 +203,10 @@ impl Store {
             .info({
                 let store_weak = store_weak.clone();
                 let graph_tx = graph_tx_clone.clone();
-                let node_id = global.id;
 
                 move |_info| {
                     if let Some(store_rc) = store_weak.upgrade() {
-                        let updated = {
-                            let store_borrow = match store_rc.try_borrow() {
-                                Ok(s) => s,
-                                Err(_) => return,
-                            };
-
-                            // Trigger device Route re-enumeration for external changes
-                            if let Some(node_internal) = store_borrow.nodes.get(&node_id) {
-                                if let Some(device_id) = node_internal.device_id {
-                                    if let Some(device) = store_borrow.devices.get(&device_id) {
-                                        device.proxy.enum_params(
-                                            0,
-                                            Some(ParamType::Route),
-                                            0,
-                                            u32::MAX,
-                                        );
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    node_internal.proxy.enum_params(
-                                        0,
-                                        Some(ParamType::Props),
-                                        0,
-                                        1,
-                                    );
-                                    true
-                                }
-                            } else {
-                                false
-                            }
-                        };
-
-                        if updated {
-                            crate::pw::graph::update_graph(&store_rc, &graph_tx);
-                        }
+                        crate::pw::graph::update_graph(&store_rc, &graph_tx);
                     }
                 }
             })
@@ -252,8 +215,6 @@ impl Store {
         node.listener = Some(listener);
         node.info_listener = Some(info_listener);
 
-        node.proxy
-            .enum_params(0, Some(pipewire::spa::param::ParamType::Props), 0, u32::MAX);
         node.proxy
             .subscribe_params(&[pipewire::spa::param::ParamType::Props]);
 
