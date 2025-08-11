@@ -1,30 +1,24 @@
 use anyhow::{anyhow, Context as AnyhowContext, Result};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use pipewire::{
     core::Info as CoreInfo, main_loop::MainLoop, registry::GlobalObject, spa::utils::dict::DictRef,
     types::ObjectType,
 };
 use std::{cell::RefCell, rc::Rc, time::Duration};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::{
+    sync::{mpsc, oneshot, watch},
+    time::{timeout, Instant},
+};
 
 use crate::pw::{
     commands::PwCommand,
     graph::{update_graph, AudioGraph, ConnectionStatus, Store},
-    DeviceType,
 };
 
 pub struct PwEngine {
     cmd_tx: mpsc::UnboundedSender<PwCommand>,
     graph_rx: watch::Receiver<AudioGraph>,
     _join_handle: Option<tokio::task::JoinHandle<()>>,
-}
-
-fn objects_ready(graph: &AudioGraph) -> bool {
-    graph
-        .devices
-        .values()
-        .all(|d| !d.profiles.is_empty() || d.device_type == DeviceType::Unknown)
-        && graph.nodes.values().all(|n| n.volume.linear > 0.0)
 }
 
 impl PwEngine {
@@ -69,35 +63,25 @@ impl PwEngine {
 
     async fn ensure_parameter_population(&self) -> Result<()> {
         let mut graph_rx = self.graph_rx.clone();
-        let mut stable_count = 0;
-        let mut last_object_count = 0;
-        let mut attempt = 0;
-        let max_attempts = 6;
+        let max_wait = Duration::from_secs(2);
+        let start = Instant::now();
 
         loop {
             let graph = graph_rx.borrow().clone();
-            let current_count = graph.nodes.len() + graph.devices.len();
 
-            if objects_ready(&graph) && current_count == last_object_count {
-                stable_count += 1;
-                if stable_count >= 2 {
-                    break;
-                }
-            } else {
-                stable_count = 0;
+            if graph.data_complete {
+                return Ok(());
             }
 
-            last_object_count = current_count;
-            attempt += 1;
-
-            if attempt >= max_attempts {
-                break;
+            if start.elapsed() > max_wait {
+                warn!("Timeout waiting for complete data, proceeding with available data");
+                return Ok(());
             }
 
-            let timeout = Duration::from_millis(50 * attempt.min(6) as u64);
-            tokio::time::timeout(timeout, graph_rx.changed()).await.ok();
+            timeout(Duration::from_millis(50), graph_rx.changed())
+                .await
+                .ok();
         }
-        Ok(())
     }
 
     pub fn graph(&self) -> AudioGraph {

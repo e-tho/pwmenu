@@ -1,6 +1,7 @@
 use crate::pw::{
     graph::{AudioGraph, Store},
     volume::VolumeResolver,
+    NodeType,
 };
 use anyhow::{anyhow, Context as AnyhowContext, Result};
 use libspa::{
@@ -907,5 +908,24 @@ impl Store {
 
         device.proxy.set_param(ParamType::Route, 0, pod_ref);
         Ok(())
+    }
+
+    pub fn update_device_type_from_nodes(&mut self, device_id: u32) {
+        let node_types: Vec<NodeType> = self
+            .nodes
+            .values()
+            .filter(|n| n.device_id == Some(device_id))
+            .map(|n| n.node_type)
+            .collect();
+
+        if let Some(device) = self.devices.get_mut(&device_id) {
+            if device.device_type == DeviceType::Unknown {
+                if node_types.iter().any(|&nt| matches!(nt, NodeType::Sink)) {
+                    device.device_type = DeviceType::Sink;
+                } else if node_types.iter().any(|&nt| matches!(nt, NodeType::Source)) {
+                    device.device_type = DeviceType::Source;
+                }
+            }
+        }
     }
 }

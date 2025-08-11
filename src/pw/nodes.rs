@@ -227,6 +227,7 @@ impl Store {
                     device.nodes.push(global.id);
                 }
             }
+            self.update_device_type_from_nodes(dev_id);
         }
         Ok(())
     }

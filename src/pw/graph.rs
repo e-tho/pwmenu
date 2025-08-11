@@ -4,6 +4,7 @@ use crate::pw::{
     metadata::MetadataManager,
     nodes::{Node, NodeInternal},
     restoration::RestorationManager,
+    DeviceType, NodeType,
 };
 use anyhow::Result;
 use log::{debug, error, info, warn};
@@ -29,6 +30,7 @@ pub struct AudioGraph {
     pub connection_status: ConnectionStatus,
     pub initial_sync_complete: bool,
     pub params_sync_complete: bool,
+    pub data_complete: bool,
 }
 
 pub struct Store {
@@ -47,6 +49,7 @@ pub struct Store {
     pub initial_sync_seq: Option<i32>,
     pub params_sync_complete: bool,
     pub params_sync_seq: Option<i32>,
+    pub data_complete: bool,
 }
 
 impl Store {
@@ -67,6 +70,7 @@ impl Store {
             initial_sync_seq: None,
             params_sync_complete: false,
             params_sync_seq: None,
+            data_complete: false,
         }
     }
 
@@ -97,6 +101,7 @@ impl Store {
             connection_status: self.connection_status,
             initial_sync_complete: self.initial_sync_complete,
             params_sync_complete: self.params_sync_complete,
+            data_complete: self.data_complete,
         }
     }
 
@@ -239,6 +244,94 @@ impl Store {
 
         self.switch_device_profile(device_id, profile_index)
     }
+
+    fn check_data_completeness(&mut self) -> bool {
+        if self.devices.is_empty() {
+            return false;
+        }
+
+        let has_audio_nodes = self
+            .nodes
+            .values()
+            .any(|n| matches!(n.node_type, NodeType::Sink | NodeType::Source));
+
+        if !has_audio_nodes {
+            return false;
+        }
+
+        let device_ids: Vec<u32> = self.devices.keys().copied().collect();
+        for device_id in device_ids {
+            self.update_device_type_from_nodes(device_id);
+        }
+
+        let mut found_audio_device = false;
+        for device in self.devices.values() {
+            if device.device_type == DeviceType::Unknown {
+                continue;
+            }
+
+            found_audio_device = true;
+
+            if device.profiles.is_empty() {
+                return false;
+            }
+
+            if device.current_profile_index.is_none() {
+                return false;
+            }
+        }
+
+        if !found_audio_device {
+            return false;
+        }
+
+        self.apply_default_fallbacks();
+
+        true
+    }
+
+    fn apply_default_fallbacks(&mut self) {
+        let has_sinks = self
+            .nodes
+            .values()
+            .any(|n| matches!(n.node_type, NodeType::Sink));
+        let has_sources = self
+            .nodes
+            .values()
+            .any(|n| matches!(n.node_type, NodeType::Source));
+
+        if has_sinks && self.default_sink.is_none() {
+            let sink_ids: Vec<u32> = self
+                .nodes
+                .iter()
+                .filter(|(_, n)| matches!(n.node_type, NodeType::Sink))
+                .map(|(id, _)| *id)
+                .collect();
+
+            if sink_ids.len() == 1 {
+                self.default_sink = Some(sink_ids[0]);
+                if let Some(node) = self.nodes.get_mut(&sink_ids[0]) {
+                    node.is_default = true;
+                }
+            }
+        }
+
+        if has_sources && self.default_source.is_none() {
+            let source_ids: Vec<u32> = self
+                .nodes
+                .iter()
+                .filter(|(_, n)| matches!(n.node_type, NodeType::Source))
+                .map(|(id, _)| *id)
+                .collect();
+
+            if source_ids.len() == 1 {
+                self.default_source = Some(source_ids[0]);
+                if let Some(node) = self.nodes.get_mut(&source_ids[0]) {
+                    node.is_default = true;
+                }
+            }
+        }
+    }
 }
 
 pub fn update_graph(store_rc: &Rc<RefCell<Store>>, graph_tx: &watch::Sender<AudioGraph>) {
@@ -250,6 +343,11 @@ pub fn update_graph(store_rc: &Rc<RefCell<Store>>, graph_tx: &watch::Sender<Audi
     {
         let mut store = store_rc.borrow_mut();
         store.update_defaults_from_metadata();
+
+        if !store.data_complete {
+            store.data_complete = store.check_data_completeness();
+        }
+
         store.restoration_manager.update_attempts_and_cleanup();
         store.restoration_manager.mark_completed(&completed_devices);
         store.restoration_manager.cleanup_expired();
