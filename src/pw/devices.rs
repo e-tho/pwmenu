@@ -497,7 +497,8 @@ impl Store {
             if volume_updated || mute_updated {
                 let volume = device.volume;
                 let muted = device.muted;
-                self.update_node_volumes_from_device(device_id, volume, muted);
+                let nodes_updated = self.update_node_volumes_from_device(device_id, volume, muted);
+                return Ok(volume_updated || mute_updated || nodes_updated);
             }
 
             return Ok(volume_updated || mute_updated);
@@ -540,27 +541,40 @@ impl Store {
             if updated {
                 let device_volume = device.volume;
                 let device_muted = device.muted;
-                self.update_node_volumes_from_device(device_id, device_volume, device_muted);
+                let nodes_updated =
+                    self.update_node_volumes_from_device(device_id, device_volume, device_muted);
+                return Ok(updated || nodes_updated);
             }
 
-            return Ok(updated);
+            return Ok(false);
         }
 
         Ok(false)
     }
 
-    fn update_node_volumes_from_device(&mut self, device_id: u32, volume: f32, muted: bool) {
+    fn update_node_volumes_from_device(
+        &mut self,
+        device_id: u32,
+        volume: f32,
+        muted: bool,
+    ) -> bool {
         let device = match self.devices.get(&device_id) {
             Some(d) => d,
-            None => return,
+            None => return false,
         };
 
+        let mut any_updated = false;
         for &node_id in &device.nodes {
             if let Some(node) = self.nodes.get_mut(&node_id) {
-                node.volume = volume;
-                node.muted = muted;
+                if (node.volume - volume).abs() > 0.001 || node.muted != muted {
+                    node.volume = volume;
+                    node.muted = muted;
+                    any_updated = true;
+                }
             }
         }
+
+        any_updated
     }
 
     pub fn get_output_devices(&self) -> Vec<(u32, String)> {

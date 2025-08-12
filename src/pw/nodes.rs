@@ -162,40 +162,34 @@ impl Store {
         let graph_tx_clone = graph_tx.clone();
 
         let listener = node
-            .proxy
-            .add_listener_local()
-            .param({
-                let store_weak = store_weak.clone();
-                let graph_tx = graph_tx_clone.clone();
-                let node_id = global.id;
+           .proxy
+           .add_listener_local()
+           .param({
+               let store_weak = store_weak.clone();
+               let graph_tx = graph_tx_clone.clone();
+               let node_id = global.id;
 
-                move |_seq,
-                      _param_type,
-                      _index,
-                      _next,
-                      pod_opt: Option<&pipewire::spa::pod::Pod>| {
-                    if let Some(actual_pod) = pod_opt {
-                        if let Some(upgraded_store_rc) = store_weak.upgrade() {
-                            let updated = {
-                                let mut store_borrow = match upgraded_store_rc.try_borrow_mut() {
-                                    Ok(s) => s,
-                                    Err(e) => {
-                                        error!(
-                                            "Failed to borrow store in node param cb {node_id}: {e}"
-                                        );
-                                        return;
-                                    }
-                                };
-                                store_borrow.update_node_param(node_id, actual_pod)
-                            };
-                            if updated {
-                                crate::pw::graph::update_graph(&upgraded_store_rc, &graph_tx);
-                            }
-                        }
-                    }
-                }
-            })
-            .register();
+               move |_seq, _param_type, _index, _next, pod_opt: Option<&pipewire::spa::pod::Pod>| {
+                   if let Some(actual_pod) = pod_opt {
+                       if let Some(upgraded_store_rc) = store_weak.upgrade() {
+                           let updated = {
+                               let mut store_borrow = match upgraded_store_rc.try_borrow_mut() {
+                                   Ok(s) => s,
+                                   Err(e) => {
+                                       error!("Failed to borrow store in node param cb {node_id}: {e}");
+                                       return;
+                                   }
+                               };
+                               store_borrow.update_node_param(node_id, actual_pod)
+                           };
+                           if updated {
+                               crate::pw::graph::update_graph(&upgraded_store_rc, &graph_tx);
+                           }
+                       }
+                   }
+               }
+           })
+           .register();
 
         let info_listener = node
             .proxy
@@ -238,6 +232,9 @@ impl Store {
         };
 
         let mut updated = false;
+        let mut new_volume: Option<f32> = None;
+        let mut new_muted: Option<bool> = None;
+
         if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
             for prop in &obj.properties {
                 match prop.key {
@@ -248,17 +245,17 @@ impl Store {
                             let scaled_volume = VolumeResolver::apply_cubic_scaling(raw_volume);
                             if (node.volume - scaled_volume).abs() > 0.001 {
                                 node.volume = scaled_volume;
+                                new_volume = Some(scaled_volume);
                                 updated = true;
                             }
                         }
                     }
                     libspa::sys::SPA_PROP_volume => {
-                        if !updated {
-                            if let Value::Float(volume) = prop.value {
-                                if (node.volume - volume).abs() > 0.001 {
-                                    node.volume = volume;
-                                    updated = true;
-                                }
+                        if let Value::Float(volume) = prop.value {
+                            if (node.volume - volume).abs() > 0.001 {
+                                node.volume = volume;
+                                new_volume = Some(volume);
+                                updated = true;
                             }
                         }
                     }
@@ -266,6 +263,7 @@ impl Store {
                         if let Value::Bool(mute) = prop.value {
                             if node.muted != mute {
                                 node.muted = mute;
+                                new_muted = Some(mute);
                                 updated = true;
                             }
                         }
@@ -274,6 +272,21 @@ impl Store {
                 }
             }
         }
+
+        // Update device volume/mute to match node when changed externally
+        if updated {
+            if let Some(device_id) = node.device_id {
+                if let Some(device) = self.devices.get_mut(&device_id) {
+                    if let Some(vol) = new_volume {
+                        device.volume = vol;
+                    }
+                    if let Some(mute) = new_muted {
+                        device.muted = mute;
+                    }
+                }
+            }
+        }
+
         updated
     }
 
