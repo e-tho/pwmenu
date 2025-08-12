@@ -884,6 +884,18 @@ impl Store {
             .ok_or_else(|| anyhow!("Failed to create Pod reference for device volume"))?;
 
         device.proxy.set_param(ParamType::Route, 0, pod_ref);
+
+        if let Some(device) = self.devices.get_mut(&device_id) {
+            device.volume = volume;
+            let node_ids = device.nodes.clone();
+
+            for node_id in node_ids {
+                if let Some(node) = self.nodes.get_mut(&node_id) {
+                    node.volume = volume;
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -907,6 +919,18 @@ impl Store {
             .ok_or_else(|| anyhow!("Failed to create Pod reference for device mute"))?;
 
         device.proxy.set_param(ParamType::Route, 0, pod_ref);
+
+        if let Some(device) = self.devices.get_mut(&device_id) {
+            device.muted = mute;
+            let node_ids = device.nodes.clone();
+
+            for node_id in node_ids {
+                if let Some(node) = self.nodes.get_mut(&node_id) {
+                    node.muted = mute;
+                }
+            }
+        }
+
         Ok(())
     }
 
