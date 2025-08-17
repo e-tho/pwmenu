@@ -28,5 +28,5 @@ pub mod pw {
     pub use self::links::{Link, Port, PortDirection};
     pub use self::nodes::{Node, NodeType, Volume};
     pub use self::restoration::RestorationManager;
-    pub use self::volume::VolumeResolver;
+    pub use self::volume::{RouteDirection, VolumeResolver};
 }

@@ -5,8 +5,8 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::pw::{
     devices::{DeviceType, Profile},
     engine::PwEngine,
-    nodes::{Node, NodeType},
-    volume::VolumeResolver,
+    nodes::{Node, NodeType, Volume},
+    volume::RouteDirection,
     AudioGraph,
 };
 
@@ -102,24 +102,40 @@ impl Controller {
         Some(self.enhance_node_volume(node, &graph))
     }
 
-    // Extract common volume enhancement logic
     fn enhance_node_volume(&self, node: &Node, graph: &AudioGraph) -> Node {
-        let mut enhanced_node = node.clone();
-
         if let Some(device_id) = node.device_id {
             if let Some(device) = graph.devices.get(&device_id) {
-                let (volume, muted) = VolumeResolver::resolve_volume(
-                    Some(device.volume),
-                    Some(device.muted),
-                    node.volume.linear,
-                    node.volume.muted,
-                );
-                enhanced_node.volume.linear = volume;
-                enhanced_node.volume.muted = muted;
+                if device.has_route_volume {
+                    let route_direction = match node.node_type {
+                        NodeType::Sink => Some(RouteDirection::Output),
+                        NodeType::Source => Some(RouteDirection::Input),
+                        _ => None,
+                    };
+
+                    if let Some(direction) = route_direction {
+                        if let Some((route_volume, route_muted)) =
+                            self.get_cached_route_volume(device, direction)
+                        {
+                            let mut enhanced_node = node.clone();
+                            enhanced_node.volume = Volume::new(route_volume, route_muted);
+                            return enhanced_node;
+                        }
+                    }
+                }
             }
         }
+        node.clone()
+    }
 
-        enhanced_node
+    fn get_cached_route_volume(
+        &self,
+        device: &crate::pw::devices::Device,
+        direction: RouteDirection,
+    ) -> Option<(f32, bool)> {
+        match direction {
+            RouteDirection::Output => device.output_route_volume.zip(device.output_route_muted),
+            RouteDirection::Input => device.input_route_volume.zip(device.input_route_muted),
+        }
     }
 
     fn sort_nodes_by_priority(&self, mut nodes: Vec<Node>) -> Vec<Node> {
@@ -223,10 +239,40 @@ impl Controller {
 
         // Try device-level control first, fall back to node-level
         let result = if let Some(device_id) = node.device_id {
-            if graph.devices.contains_key(&device_id) {
-                match self.engine.set_device_volume(device_id, volume).await {
-                    Ok(()) => Ok(()),
-                    Err(_) => self.engine.set_node_volume(node_id, volume).await,
+            if let Some(device) = graph.devices.get(&device_id) {
+                if device.has_route_volume {
+                    let target_direction = match node.node_type {
+                        NodeType::Sink => {
+                            if device.output_route_index.is_some() {
+                                Some(RouteDirection::Output)
+                            } else {
+                                None
+                            }
+                        }
+                        NodeType::Source => {
+                            if device.input_route_index.is_some() {
+                                Some(RouteDirection::Input)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(direction) = target_direction {
+                        match self
+                            .engine
+                            .set_device_volume(device_id, volume, Some(direction))
+                            .await
+                        {
+                            Ok(()) => Ok(()),
+                            Err(_) => self.engine.set_node_volume(node_id, volume).await,
+                        }
+                    } else {
+                        self.engine.set_node_volume(node_id, volume).await
+                    }
+                } else {
+                    self.engine.set_node_volume(node_id, volume).await
                 }
             } else {
                 self.engine.set_node_volume(node_id, volume).await
@@ -258,10 +304,40 @@ impl Controller {
 
         // Try device-level control first, fall back to node-level
         let result = if let Some(device_id) = node.device_id {
-            if graph.devices.contains_key(&device_id) {
-                match self.engine.set_device_mute(device_id, mute).await {
-                    Ok(()) => Ok(()),
-                    Err(_) => self.engine.set_node_mute(node_id, mute).await,
+            if let Some(device) = graph.devices.get(&device_id) {
+                if device.has_route_volume {
+                    let target_direction = match node.node_type {
+                        NodeType::Sink => {
+                            if device.output_route_index.is_some() {
+                                Some(RouteDirection::Output)
+                            } else {
+                                None
+                            }
+                        }
+                        NodeType::Source => {
+                            if device.input_route_index.is_some() {
+                                Some(RouteDirection::Input)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(direction) = target_direction {
+                        match self
+                            .engine
+                            .set_device_mute(device_id, mute, Some(direction))
+                            .await
+                        {
+                            Ok(()) => Ok(()),
+                            Err(_) => self.engine.set_node_mute(node_id, mute).await,
+                        }
+                    } else {
+                        self.engine.set_node_mute(node_id, mute).await
+                    }
+                } else {
+                    self.engine.set_node_mute(node_id, mute).await
                 }
             } else {
                 self.engine.set_node_mute(node_id, mute).await

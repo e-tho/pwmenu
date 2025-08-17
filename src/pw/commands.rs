@@ -1,6 +1,8 @@
 use anyhow::Result;
 use tokio::sync::oneshot;
 
+use crate::pw::volume::RouteDirection;
+
 #[derive(Debug)]
 pub enum PwCommand {
     SetNodeVolume {
@@ -44,11 +46,13 @@ pub enum PwCommand {
     SetDeviceVolume {
         device_id: u32,
         volume: f32,
+        direction: Option<RouteDirection>,
         result_sender: oneshot::Sender<Result<()>>,
     },
     SetDeviceMute {
         device_id: u32,
         mute: bool,
+        direction: Option<RouteDirection>,
         result_sender: oneshot::Sender<Result<()>>,
     },
     Exit,

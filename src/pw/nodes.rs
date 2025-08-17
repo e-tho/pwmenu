@@ -234,8 +234,6 @@ impl Store {
         };
 
         let mut updated = false;
-        let mut new_volume: Option<f32> = None;
-        let mut new_muted: Option<bool> = None;
 
         if !node.has_received_params {
             node.has_received_params = true;
@@ -252,7 +250,6 @@ impl Store {
                             let scaled_volume = VolumeResolver::apply_cubic_scaling(raw_volume);
                             if (node.volume - scaled_volume).abs() > 0.001 {
                                 node.volume = scaled_volume;
-                                new_volume = Some(scaled_volume);
                                 updated = true;
                             }
                         }
@@ -261,7 +258,6 @@ impl Store {
                         if let Value::Float(volume) = prop.value {
                             if (node.volume - volume).abs() > 0.001 {
                                 node.volume = volume;
-                                new_volume = Some(volume);
                                 updated = true;
                             }
                         }
@@ -270,26 +266,11 @@ impl Store {
                         if let Value::Bool(mute) = prop.value {
                             if node.muted != mute {
                                 node.muted = mute;
-                                new_muted = Some(mute);
                                 updated = true;
                             }
                         }
                     }
                     _ => {}
-                }
-            }
-        }
-
-        // Update device volume/mute to match node when changed externally
-        if updated {
-            if let Some(device_id) = node.device_id {
-                if let Some(device) = self.devices.get_mut(&device_id) {
-                    if let Some(vol) = new_volume {
-                        device.volume = vol;
-                    }
-                    if let Some(mute) = new_muted {
-                        device.muted = mute;
-                    }
                 }
             }
         }

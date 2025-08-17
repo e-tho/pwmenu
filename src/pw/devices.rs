@@ -1,6 +1,6 @@
 use crate::pw::{
     graph::{AudioGraph, Store},
-    volume::VolumeResolver,
+    volume::{RouteDirection, VolumeResolver},
     NodeType,
 };
 use anyhow::{anyhow, Context as AnyhowContext, Result};
@@ -12,7 +12,7 @@ use libspa::{
         SPA_PARAM_PROFILE_save, SPA_TYPE_OBJECT_ParamProfile,
     },
 };
-use log::{debug, error};
+use log::{debug, error, warn};
 use pipewire::spa::{
     param::ParamType,
     pod::{deserialize::PodDeserializer, Pod, Value},
@@ -69,8 +69,15 @@ pub struct Device {
     pub nodes: Vec<u32>,
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
-    pub volume: f32,
-    pub muted: bool,
+    pub has_route_volume: bool,
+    pub output_route_index: Option<i32>,
+    pub output_route_device: Option<i32>,
+    pub input_route_index: Option<i32>,
+    pub input_route_device: Option<i32>,
+    pub output_route_volume: Option<f32>,
+    pub output_route_muted: Option<bool>,
+    pub input_route_volume: Option<f32>,
+    pub input_route_muted: Option<bool>,
 }
 
 pub struct DeviceInternal {
@@ -86,12 +93,15 @@ pub struct DeviceInternal {
     pub current_profile_index: Option<u32>,
     pub proxy: pipewire::device::Device,
     pub listener: Option<pipewire::device::DeviceListener>,
-    pub volume: f32,
-    pub muted: bool,
     pub output_route_index: Option<i32>,
     pub output_route_device: Option<i32>,
     pub input_route_index: Option<i32>,
     pub input_route_device: Option<i32>,
+    pub output_route_volume: Option<f32>,
+    pub output_route_muted: Option<bool>,
+    pub input_route_volume: Option<f32>,
+    pub input_route_muted: Option<bool>,
+    pub has_route_volume: bool,
 }
 
 impl DeviceInternal {
@@ -107,8 +117,15 @@ impl DeviceInternal {
             nodes: self.nodes.clone(),
             profiles: self.profiles.clone(),
             current_profile_index: self.current_profile_index,
-            volume: self.volume,
-            muted: self.muted,
+            has_route_volume: self.has_route_volume,
+            output_route_index: self.output_route_index,
+            output_route_device: self.output_route_device,
+            input_route_index: self.input_route_index,
+            input_route_device: self.input_route_device,
+            output_route_volume: self.output_route_volume,
+            output_route_muted: self.output_route_muted,
+            input_route_volume: self.input_route_volume,
+            input_route_muted: self.input_route_muted,
         }
     }
 
@@ -122,6 +139,13 @@ impl DeviceInternal {
     pub fn get_current_profile(&self) -> Option<&Profile> {
         self.current_profile_index
             .and_then(|index| self.profiles.iter().find(|p| p.index == index))
+    }
+
+    pub fn get_route_volume(&self, direction: RouteDirection) -> Option<(f32, bool)> {
+        match direction {
+            RouteDirection::Output => self.output_route_volume.zip(self.output_route_muted),
+            RouteDirection::Input => self.input_route_volume.zip(self.input_route_muted),
+        }
     }
 
     pub fn switch_profile(&self, profile_index: u32) -> Result<()> {
@@ -247,12 +271,15 @@ impl Store {
             current_profile_index: None,
             proxy,
             listener: None,
-            volume: 1.0,
-            muted: false,
             output_route_index: None,
             output_route_device: None,
             input_route_index: None,
             input_route_device: None,
+            output_route_volume: None,
+            output_route_muted: None,
+            input_route_volume: None,
+            input_route_muted: None,
+            has_route_volume: false,
         };
 
         self.setup_device_monitoring(&mut device, store_rc, graph_tx);
@@ -272,9 +299,6 @@ impl Store {
             ParamType::Route => self
                 .parse_route_volume_data(device_id, pod)
                 .unwrap_or(false),
-            ParamType::Props => self
-                .parse_device_props_volume(device_id, pod)
-                .unwrap_or(false),
             ParamType::EnumProfile => self
                 .handle_device_profile_list(device_id, pod)
                 .unwrap_or(false),
@@ -291,9 +315,9 @@ impl Store {
         store_rc: &Rc<RefCell<Store>>,
         graph_tx: &watch::Sender<AudioGraph>,
     ) {
+        let device_id = device.id;
         let store_weak = Rc::downgrade(store_rc);
         let graph_tx_clone = graph_tx.clone();
-        let device_id = device.id;
 
         let listener = device
             .proxy
@@ -305,13 +329,10 @@ impl Store {
                     if let Some(pod) = pod_opt {
                         if let Some(store_rc) = store_weak.upgrade() {
                             let updated = match store_rc.try_borrow_mut() {
-                                Ok(mut store_borrow) => {
-                                    store_borrow.handle_device_parameter(device_id, param_type, pod)
+                                Ok(mut store) => {
+                                    store.handle_device_parameter(device_id, param_type, pod)
                                 }
-                                Err(e) => {
-                                    error!("Failed to borrow store for device {device_id}: {e}");
-                                    return;
-                                }
+                                Err(_) => false,
                             };
 
                             if updated {
@@ -375,21 +396,15 @@ impl Store {
 
         device.listener = Some(listener);
 
-        // Subscribe to volume and profile parameters
         device.proxy.subscribe_params(&[
             ParamType::Route,
-            ParamType::Props,
             ParamType::EnumProfile,
             ParamType::Profile,
         ]);
 
-        // Initialize parameter enumeration
-        device.proxy.subscribe_params(&[
-            ParamType::Route,
-            ParamType::Props,
-            ParamType::EnumProfile,
-            ParamType::Profile,
-        ]);
+        device
+            .proxy
+            .enum_params(0, Some(ParamType::Route), 0, u32::MAX);
     }
 
     pub fn parse_route_volume_data(&mut self, device_id: u32, pod: &Pod) -> Result<bool> {
@@ -402,6 +417,9 @@ impl Store {
             let mut route_direction: Option<u32> = None;
             let mut route_index: Option<i32> = None;
             let mut route_device: Option<i32> = None;
+            let mut has_volume_props = false;
+            let mut route_volume: Option<f32> = None;
+            let mut route_muted: Option<bool> = None;
 
             for prop in &obj.properties {
                 match prop.key {
@@ -420,53 +438,32 @@ impl Store {
                             route_device = Some(device_num);
                         }
                     }
-                    _ => {}
-                }
-            }
-
-            // Cache route info for all routes
-            if let (Some(direction), Some(index), Some(device_num)) =
-                (route_direction, route_index, route_device)
-            {
-                if direction == 1 {
-                    device.output_route_index = Some(index);
-                    device.output_route_device = Some(device_num);
-                } else if direction == 0 {
-                    device.input_route_index = Some(index);
-                    device.input_route_device = Some(device_num);
-                }
-            }
-
-            let should_process_route = matches!(
-                (device.device_type, route_direction),
-                (DeviceType::Sink, Some(1)) | (DeviceType::Source, Some(0))
-            );
-
-            if !should_process_route {
-                return Ok(false);
-            }
-
-            let mut volume_updated = false;
-            let mut mute_updated = false;
-            let mut channel_volumes: Option<f32> = None;
-
-            for prop in &obj.properties {
-                match prop.key {
                     libspa::sys::SPA_PARAM_ROUTE_props => {
                         if let Value::Object(props_obj) = &prop.value {
                             for volume_prop in &props_obj.properties {
                                 match volume_prop.key {
                                     k if k == libspa::sys::SPA_PROP_channelVolumes => {
-                                        channel_volumes = VolumeResolver::extract_channel_volume(
-                                            &volume_prop.value,
-                                        );
+                                        has_volume_props = true;
+                                        if let Some(raw_volume) =
+                                            VolumeResolver::extract_channel_volume(
+                                                &volume_prop.value,
+                                            )
+                                        {
+                                            route_volume = Some(
+                                                VolumeResolver::apply_cubic_scaling(raw_volume),
+                                            );
+                                        }
+                                    }
+                                    k if k == libspa::sys::SPA_PROP_volume => {
+                                        has_volume_props = true;
+                                        if let Value::Float(vol) = volume_prop.value {
+                                            route_volume = Some(vol);
+                                        }
                                     }
                                     k if k == libspa::sys::SPA_PROP_mute => {
+                                        has_volume_props = true;
                                         if let Value::Bool(mute) = volume_prop.value {
-                                            if device.muted != mute {
-                                                device.muted = mute;
-                                                mute_updated = true;
-                                            }
+                                            route_muted = Some(mute);
                                         }
                                     }
                                     _ => {}
@@ -474,107 +471,58 @@ impl Store {
                             }
                         }
                     }
-                    k if k == libspa::sys::SPA_PROP_mute => {
-                        if let Value::Bool(mute) = prop.value {
-                            if device.muted != mute {
-                                device.muted = mute;
-                                mute_updated = true;
-                            }
-                        }
-                    }
                     _ => {}
                 }
             }
 
-            if let Some(ch_vol) = channel_volumes {
-                let user_facing_volume = VolumeResolver::apply_cubic_scaling(ch_vol);
-                if (device.volume - user_facing_volume).abs() > 0.001 {
-                    device.volume = user_facing_volume;
-                    volume_updated = true;
+            if let (Some(direction), Some(index), Some(device_num)) =
+                (route_direction, route_index, route_device)
+            {
+                let mut cache_updated = false;
+
+                if direction == 1 {
+                    device.output_route_index = Some(index);
+                    device.output_route_device = Some(device_num);
+
+                    if let Some(volume) = route_volume {
+                        if device.output_route_volume != Some(volume) {
+                            device.output_route_volume = Some(volume);
+                            cache_updated = true;
+                        }
+                    }
+                    if let Some(muted) = route_muted {
+                        if device.output_route_muted != Some(muted) {
+                            device.output_route_muted = Some(muted);
+                            cache_updated = true;
+                        }
+                    }
+                } else if direction == 0 {
+                    device.input_route_index = Some(index);
+                    device.input_route_device = Some(device_num);
+
+                    if let Some(volume) = route_volume {
+                        if device.input_route_volume != Some(volume) {
+                            device.input_route_volume = Some(volume);
+                            cache_updated = true;
+                        }
+                    }
+                    if let Some(muted) = route_muted {
+                        if device.input_route_muted != Some(muted) {
+                            device.input_route_muted = Some(muted);
+                            cache_updated = true;
+                        }
+                    }
                 }
-            }
 
-            if volume_updated || mute_updated {
-                let volume = device.volume;
-                let muted = device.muted;
-                let nodes_updated = self.update_node_volumes_from_device(device_id, volume, muted);
-                return Ok(volume_updated || mute_updated || nodes_updated);
-            }
+                if has_volume_props {
+                    device.has_route_volume = true;
+                }
 
-            return Ok(volume_updated || mute_updated);
+                return Ok(cache_updated || route_direction.is_some());
+            }
         }
 
         Ok(false)
-    }
-
-    pub fn parse_device_props_volume(&mut self, device_id: u32, pod: &Pod) -> Result<bool> {
-        let device = self
-            .devices
-            .get_mut(&device_id)
-            .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
-
-        if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
-            let mut updated = false;
-
-            for prop in &obj.properties {
-                match prop.key {
-                    libspa::sys::SPA_PROP_volume => {
-                        if let Value::Float(volume) = prop.value {
-                            if (device.volume - volume).abs() > 0.001 {
-                                device.volume = volume;
-                                updated = true;
-                            }
-                        }
-                    }
-                    libspa::sys::SPA_PROP_mute => {
-                        if let Value::Bool(mute) = prop.value {
-                            if device.muted != mute {
-                                device.muted = mute;
-                                updated = true;
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
-            if updated {
-                let device_volume = device.volume;
-                let device_muted = device.muted;
-                let nodes_updated =
-                    self.update_node_volumes_from_device(device_id, device_volume, device_muted);
-                return Ok(updated || nodes_updated);
-            }
-
-            return Ok(false);
-        }
-
-        Ok(false)
-    }
-
-    fn update_node_volumes_from_device(
-        &mut self,
-        device_id: u32,
-        volume: f32,
-        muted: bool,
-    ) -> bool {
-        let device = match self.devices.get(&device_id) {
-            Some(d) => d,
-            None => return false,
-        };
-
-        let mut any_updated = false;
-        for &node_id in &device.nodes {
-            if let Some(node) = self.nodes.get_mut(&node_id) {
-                if (node.volume - volume).abs() > 0.001 || node.muted != muted {
-                    node.volume = volume;
-                    node.muted = muted;
-                    any_updated = true;
-                }
-            }
-        }
-
-        any_updated
     }
 
     pub fn get_output_devices(&self) -> Vec<(u32, String)> {
@@ -764,54 +712,6 @@ impl Store {
         device.switch_profile(profile_index)
     }
 
-    fn determine_effective_device_type(&self, device: &DeviceInternal) -> Result<DeviceType> {
-        if device.device_type != DeviceType::Unknown {
-            return Ok(device.device_type);
-        }
-
-        let node_types: Vec<_> = device
-            .nodes
-            .iter()
-            .filter_map(|&node_id| self.nodes.get(&node_id))
-            .map(|node| node.node_type)
-            .collect();
-
-        if node_types
-            .iter()
-            .any(|&nt| matches!(nt, crate::pw::nodes::NodeType::Sink))
-        {
-            Ok(DeviceType::Sink)
-        } else if node_types
-            .iter()
-            .any(|&nt| matches!(nt, crate::pw::nodes::NodeType::Source))
-        {
-            Ok(DeviceType::Source)
-        } else {
-            Err(anyhow!(
-                "Cannot determine device type for device {}",
-                device.id
-            ))
-        }
-    }
-
-    fn get_route_info(
-        &self,
-        device: &DeviceInternal,
-        device_type: DeviceType,
-    ) -> Result<(i32, i32)> {
-        match device_type {
-            DeviceType::Sink => device
-                .output_route_index
-                .zip(device.output_route_device)
-                .ok_or_else(|| anyhow!("No cached output route info for device {}", device.id)),
-            DeviceType::Source => device
-                .input_route_index
-                .zip(device.input_route_device)
-                .ok_or_else(|| anyhow!("No cached input route info for device {}", device.id)),
-            DeviceType::Unknown => Err(anyhow!("Cannot get route info for Unknown device type")),
-        }
-    }
-
     fn build_route_parameter_pod(
         &self,
         route_index: i32,
@@ -865,47 +765,107 @@ impl Store {
         Ok(buffer)
     }
 
-    pub fn set_device_volume(&mut self, device_id: u32, volume: f32) -> Result<()> {
-        let device = self
-            .devices
-            .get(&device_id)
-            .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
+    pub fn set_device_volume(
+        &mut self,
+        device_id: u32,
+        volume: f32,
+        direction: Option<RouteDirection>,
+    ) -> Result<()> {
+        let target_direction = if let Some(dir) = direction {
+            let device = self
+                .devices
+                .get(&device_id)
+                .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
-        let effective_device_type = self.determine_effective_device_type(device)?;
-        let (route_index, route_device) = self.get_route_info(device, effective_device_type)?;
-
-        let raw_volume = VolumeResolver::apply_inverse_cubic_scaling(volume.clamp(0.0, 1.0));
-
-        let buffer = self.build_route_parameter_pod(route_index, route_device, |builder| {
-            builder
-                .add_prop(libspa::sys::SPA_PROP_channelVolumes, 0)
-                .context("Failed to add channelVolumes property")?;
-
-            let volumes = [raw_volume; 2];
-            unsafe {
-                builder
-                    .add_array(
-                        std::mem::size_of::<f32>() as u32,
-                        pipewire::spa::utils::SpaTypes::Float.as_raw(),
-                        volumes.len() as u32,
-                        volumes.as_ptr() as *const std::ffi::c_void,
-                    )
-                    .context("Failed to add volume array")
+            match dir {
+                RouteDirection::Output => {
+                    if device.output_route_index.is_some() {
+                        Some(dir)
+                    } else {
+                        None
+                    }
+                }
+                RouteDirection::Input => {
+                    if device.input_route_index.is_some() {
+                        Some(dir)
+                    } else {
+                        None
+                    }
+                }
             }
-        })?;
+        } else {
+            None
+        };
 
-        let pod_ref = Pod::from_bytes(&buffer)
-            .ok_or_else(|| anyhow!("Failed to create Pod reference for device volume"))?;
+        if let Some(direction) = target_direction {
+            let (route_index, route_device) = {
+                let device = self
+                    .devices
+                    .get(&device_id)
+                    .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
-        device.proxy.set_param(ParamType::Route, 0, pod_ref);
+                match direction {
+                    RouteDirection::Output => (
+                        device.output_route_index.unwrap(),
+                        device.output_route_device.unwrap(),
+                    ),
+                    RouteDirection::Input => (
+                        device.input_route_index.unwrap(),
+                        device.input_route_device.unwrap(),
+                    ),
+                }
+            };
 
-        if let Some(device) = self.devices.get_mut(&device_id) {
-            device.volume = volume;
-            let node_ids = device.nodes.clone();
+            let raw_volume = VolumeResolver::apply_inverse_cubic_scaling(volume.clamp(0.0, 1.0));
+
+            let buffer = self.build_route_parameter_pod(route_index, route_device, |builder| {
+                builder
+                    .add_prop(libspa::sys::SPA_PROP_channelVolumes, 0)
+                    .context("Failed to add channelVolumes property")?;
+
+                let volumes = [raw_volume; 2];
+                unsafe {
+                    builder
+                        .add_array(
+                            std::mem::size_of::<f32>() as u32,
+                            pipewire::spa::utils::SpaTypes::Float.as_raw(),
+                            volumes.len() as u32,
+                            volumes.as_ptr() as *const std::ffi::c_void,
+                        )
+                        .context("Failed to add volume array")
+                }
+            })?;
+
+            let pod_ref = Pod::from_bytes(&buffer)
+                .ok_or_else(|| anyhow!("Failed to create Pod reference for device volume"))?;
+
+            let device = self
+                .devices
+                .get_mut(&device_id)
+                .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
+
+            device.proxy.set_param(ParamType::Route, 0, pod_ref);
+
+            match direction {
+                RouteDirection::Output => {
+                    device.output_route_volume = Some(volume);
+                }
+                RouteDirection::Input => {
+                    device.input_route_volume = Some(volume);
+                }
+            }
+        } else {
+            let node_ids: Vec<u32> = {
+                let device = self
+                    .devices
+                    .get(&device_id)
+                    .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
+                device.nodes.clone()
+            };
 
             for node_id in node_ids {
-                if let Some(node) = self.nodes.get_mut(&node_id) {
-                    node.volume = volume;
+                if let Err(e) = self.set_node_volume(node_id, volume) {
+                    warn!("Failed to set volume on node {node_id}: {e}");
                 }
             }
         }
@@ -913,34 +873,94 @@ impl Store {
         Ok(())
     }
 
-    pub fn set_device_mute(&mut self, device_id: u32, mute: bool) -> Result<()> {
-        let device = self
-            .devices
-            .get(&device_id)
-            .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
+    pub fn set_device_mute(
+        &mut self,
+        device_id: u32,
+        mute: bool,
+        direction: Option<RouteDirection>,
+    ) -> Result<()> {
+        let target_direction = if let Some(dir) = direction {
+            let device = self
+                .devices
+                .get(&device_id)
+                .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
-        let effective_device_type = self.determine_effective_device_type(device)?;
-        let (route_index, route_device) = self.get_route_info(device, effective_device_type)?;
+            match dir {
+                RouteDirection::Output => {
+                    if device.output_route_index.is_some() {
+                        Some(dir)
+                    } else {
+                        None
+                    }
+                }
+                RouteDirection::Input => {
+                    if device.input_route_index.is_some() {
+                        Some(dir)
+                    } else {
+                        None
+                    }
+                }
+            }
+        } else {
+            None
+        };
 
-        let buffer = self.build_route_parameter_pod(route_index, route_device, |builder| {
-            builder
-                .add_prop(libspa::sys::SPA_PROP_mute, 0)
-                .and_then(|_| builder.add_bool(mute))
-                .context("Failed to add mute property")
-        })?;
+        if let Some(direction) = target_direction {
+            let (route_index, route_device) = {
+                let device = self
+                    .devices
+                    .get(&device_id)
+                    .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
-        let pod_ref = Pod::from_bytes(&buffer)
-            .ok_or_else(|| anyhow!("Failed to create Pod reference for device mute"))?;
+                match direction {
+                    RouteDirection::Output => (
+                        device.output_route_index.unwrap(),
+                        device.output_route_device.unwrap(),
+                    ),
+                    RouteDirection::Input => (
+                        device.input_route_index.unwrap(),
+                        device.input_route_device.unwrap(),
+                    ),
+                }
+            };
 
-        device.proxy.set_param(ParamType::Route, 0, pod_ref);
+            let buffer = self.build_route_parameter_pod(route_index, route_device, |builder| {
+                builder
+                    .add_prop(libspa::sys::SPA_PROP_mute, 0)
+                    .and_then(|_| builder.add_bool(mute))
+                    .context("Failed to add mute property")
+            })?;
 
-        if let Some(device) = self.devices.get_mut(&device_id) {
-            device.muted = mute;
-            let node_ids = device.nodes.clone();
+            let pod_ref = Pod::from_bytes(&buffer)
+                .ok_or_else(|| anyhow!("Failed to create Pod reference for device mute"))?;
+
+            let device = self
+                .devices
+                .get_mut(&device_id)
+                .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
+
+            device.proxy.set_param(ParamType::Route, 0, pod_ref);
+
+            match direction {
+                RouteDirection::Output => {
+                    device.output_route_muted = Some(mute);
+                }
+                RouteDirection::Input => {
+                    device.input_route_muted = Some(mute);
+                }
+            }
+        } else {
+            let node_ids: Vec<u32> = {
+                let device = self
+                    .devices
+                    .get(&device_id)
+                    .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
+                device.nodes.clone()
+            };
 
             for node_id in node_ids {
-                if let Some(node) = self.nodes.get_mut(&node_id) {
-                    node.muted = mute;
+                if let Err(e) = self.set_node_mute(node_id, mute) {
+                    warn!("Failed to set mute on node {node_id}: {e}");
                 }
             }
         }

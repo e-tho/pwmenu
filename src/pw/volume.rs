@@ -1,17 +1,24 @@
 use libspa::pod::{Value, ValueArray};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RouteDirection {
+    Input,
+    Output,
+}
+
 pub struct VolumeResolver;
 
 impl VolumeResolver {
-    pub fn resolve_volume(
-        device_volume: Option<f32>,
-        device_muted: Option<bool>,
+    pub fn resolve_effective_volume(
+        route_volume: Option<f32>,
+        route_muted: Option<bool>,
         node_volume: f32,
         node_muted: bool,
+        has_route_volume: bool,
     ) -> (f32, bool) {
-        if let (Some(dev_vol), Some(dev_muted)) = (device_volume, device_muted) {
-            if dev_vol > 0.0 && dev_vol != 1.0 {
-                return (dev_vol, dev_muted);
+        if has_route_volume {
+            if let (Some(vol), Some(muted)) = (route_volume, route_muted) {
+                return (vol, muted);
             }
         }
 

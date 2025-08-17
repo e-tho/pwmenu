@@ -50,6 +50,7 @@ pub struct Store {
     pub params_sync_complete: bool,
     pub params_sync_seq: Option<i32>,
     pub data_complete: bool,
+    pub refresh_pending: bool,
 }
 
 impl Store {
@@ -71,6 +72,7 @@ impl Store {
             params_sync_complete: false,
             params_sync_seq: None,
             data_complete: false,
+            refresh_pending: false,
         }
     }
 

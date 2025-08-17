@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context as AnyhowContext, Result};
+use libspa::param::ParamType;
 use log::{debug, error, info, warn};
 use pipewire::{
     core::Info as CoreInfo, main_loop::MainLoop, registry::GlobalObject, spa::utils::dict::DictRef,
@@ -13,6 +14,7 @@ use tokio::{
 use crate::pw::{
     commands::PwCommand,
     graph::{update_graph, AudioGraph, ConnectionStatus, Store},
+    volume::RouteDirection,
 };
 
 pub struct PwEngine {
@@ -180,19 +182,31 @@ impl PwEngine {
         .await
     }
 
-    pub async fn set_device_volume(&self, device_id: u32, volume: f32) -> Result<()> {
+    pub async fn set_device_volume(
+        &self,
+        device_id: u32,
+        volume: f32,
+        direction: Option<RouteDirection>,
+    ) -> Result<()> {
         self.send_command_and_wait(|rs| PwCommand::SetDeviceVolume {
             device_id,
             volume,
+            direction,
             result_sender: rs,
         })
         .await
     }
 
-    pub async fn set_device_mute(&self, device_id: u32, mute: bool) -> Result<()> {
+    pub async fn set_device_mute(
+        &self,
+        device_id: u32,
+        mute: bool,
+        direction: Option<RouteDirection>,
+    ) -> Result<()> {
         self.send_command_and_wait(|rs| PwCommand::SetDeviceMute {
             device_id,
             mute,
+            direction,
             result_sender: rs,
         })
         .await
@@ -255,7 +269,9 @@ fn run_pipewire_loop(
                     if global.type_ == ObjectType::Metadata {
                         if let Some(props) = &global.props {
                             if let Some("default") = props.get("metadata.name") {
-                                match registry.bind::<pipewire::metadata::Metadata, &DictRef>(global) {
+                                match registry
+                                    .bind::<pipewire::metadata::Metadata, &DictRef>(global)
+                                {
                                     Ok(metadata) => {
                                         debug!("Found and bound to default metadata object");
                                         if let Ok(mut store) = store_rc.try_borrow_mut() {
@@ -289,6 +305,19 @@ fn run_pipewire_loop(
                         Ok(added) => {
                             if added {
                                 update_graph(&store_rc, &graph_tx);
+                            }
+
+                            if global.type_ == ObjectType::Client {
+                                let should_refresh = {
+                                    let store = store_rc.borrow();
+                                    !store.refresh_pending
+                                };
+
+                                if should_refresh {
+                                    store_rc.borrow_mut().refresh_pending = true;
+                                    refresh_route_capable_devices(&store_rc);
+                                    store_rc.borrow_mut().refresh_pending = false;
+                                }
                             }
                         }
                         Err(e) => error!("Error adding object {}: {:?}", global.id, e),
@@ -438,15 +467,23 @@ fn run_pipewire_loop(
                     PwCommand::SetDeviceVolume {
                         device_id,
                         volume,
+                        direction,
                         result_sender,
-                    } => {
-                        result_sender.send(store.borrow_mut().set_device_volume(device_id, volume))
-                    }
+                    } => result_sender.send(
+                        store
+                            .borrow_mut()
+                            .set_device_volume(device_id, volume, direction),
+                    ),
                     PwCommand::SetDeviceMute {
                         device_id,
                         mute,
+                        direction,
                         result_sender,
-                    } => result_sender.send(store.borrow_mut().set_device_mute(device_id, mute)),
+                    } => result_sender.send(
+                        store
+                            .borrow_mut()
+                            .set_device_mute(device_id, mute, direction),
+                    ),
                     PwCommand::Exit => unreachable!("Exit handled above"),
                 };
 
@@ -485,6 +522,34 @@ fn run_pipewire_loop(
     drop(mainloop);
 
     Ok(())
+}
+
+fn refresh_route_capable_devices(store_rc: &Rc<RefCell<Store>>) {
+    let devices_to_refresh: Vec<u32> = {
+        let store = store_rc.borrow();
+        store
+            .devices
+            .iter()
+            .filter(|(_, device)| device.has_route_volume)
+            .map(|(id, _)| *id)
+            .collect()
+    };
+
+    if !devices_to_refresh.is_empty() {
+        debug!(
+            "Refreshing Route parameters for {} route-capable devices due to external changes",
+            devices_to_refresh.len()
+        );
+
+        let store = store_rc.borrow();
+        for device_id in devices_to_refresh {
+            if let Some(device) = store.devices.get(&device_id) {
+                device
+                    .proxy
+                    .enum_params(0, Some(ParamType::Route), 0, u32::MAX);
+            }
+        }
+    }
 }
 
 impl Store {
