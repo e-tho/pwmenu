@@ -76,6 +76,7 @@ pub struct NodeInternal {
     pub proxy: pipewire::node::Node,
     pub listener: Option<pipewire::node::NodeListener>,
     pub info_listener: Option<pipewire::node::NodeListener>,
+    pub has_received_params: bool,
 }
 
 impl NodeInternal {
@@ -156,6 +157,7 @@ impl Store {
             proxy,
             listener: None,
             info_listener: None,
+            has_received_params: false,
         };
 
         let store_weak = Rc::downgrade(store_rc);
@@ -234,6 +236,11 @@ impl Store {
         let mut updated = false;
         let mut new_volume: Option<f32> = None;
         let mut new_muted: Option<bool> = None;
+
+        if !node.has_received_params {
+            node.has_received_params = true;
+            updated = true;
+        }
 
         if let Ok((_, Value::Object(obj))) = PodDeserializer::deserialize_any_from(pod.as_bytes()) {
             for prop in &obj.properties {

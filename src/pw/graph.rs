@@ -259,6 +259,16 @@ impl Store {
             return false;
         }
 
+        let all_audio_nodes_have_params = self
+            .nodes
+            .values()
+            .filter(|n| matches!(n.node_type, NodeType::Sink | NodeType::Source))
+            .all(|n| n.has_received_params);
+
+        if !all_audio_nodes_have_params {
+            return false;
+        }
+
         let device_ids: Vec<u32> = self.devices.keys().copied().collect();
         for device_id in device_ids {
             self.update_device_type_from_nodes(device_id);
