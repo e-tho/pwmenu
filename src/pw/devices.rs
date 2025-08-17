@@ -340,26 +340,24 @@ impl Store {
                 move |info| {
                     if let Some(store_rc) = store_weak.upgrade() {
                         let updated = match store_rc.try_borrow_mut() {
-                            Ok(mut store_borrow) => {
+                            Ok(mut store) => {
                                 if let Some(props) = info.props() {
-                                    let bus = get_device_bus(props).map(str::to_string);
-                                    let form_factor =
-                                        get_device_form_factor(props).map(str::to_string);
-
-                                    if let Some(device) = store_borrow.devices.get_mut(&device_id) {
+                                    if let Some(device) = store.devices.get_mut(&device_id) {
                                         let mut updated = false;
 
-                                        if let Some(new_bus) = bus {
-                                            if device.bus.as_ref() != Some(&new_bus) {
-                                                device.bus = Some(new_bus);
+                                        if let Some(bus) = get_device_bus(props).map(str::to_string)
+                                        {
+                                            if device.bus.as_ref() != Some(&bus) {
+                                                device.bus = Some(bus);
                                                 updated = true;
                                             }
                                         }
 
-                                        if let Some(new_form_factor) = form_factor {
-                                            if device.form_factor.as_ref() != Some(&new_form_factor)
-                                            {
-                                                device.form_factor = Some(new_form_factor);
+                                        if let Some(form_factor) =
+                                            get_device_form_factor(props).map(str::to_string)
+                                        {
+                                            if device.form_factor.as_ref() != Some(&form_factor) {
+                                                device.form_factor = Some(form_factor);
                                                 updated = true;
                                             }
                                         }
@@ -829,6 +827,7 @@ impl Store {
                 .devices
                 .get_mut(&device_id)
                 .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
+
             device.proxy.set_param(ParamType::Route, 0, pod_ref);
 
             match direction {
