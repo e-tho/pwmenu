@@ -49,6 +49,28 @@ impl Profile {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RouteInfo {
+    pub index: Option<i32>,
+    pub device: Option<i32>,
+    pub volume: Option<f32>,
+    pub muted: Option<bool>,
+}
+
+impl RouteInfo {
+    pub fn is_available(&self) -> bool {
+        self.index.is_some() && self.device.is_some()
+    }
+
+    pub fn get_route_params(&self) -> Option<(i32, i32)> {
+        self.index.zip(self.device)
+    }
+
+    pub fn get_volume_state(&self) -> Option<(f32, bool)> {
+        self.volume.zip(self.muted)
+    }
+}
+
 fn get_device_bus(props: &DictRef) -> Option<&str> {
     props.get("device.bus")
 }
@@ -70,14 +92,8 @@ pub struct Device {
     pub profiles: Vec<Profile>,
     pub current_profile_index: Option<u32>,
     pub has_route_volume: bool,
-    pub output_route_index: Option<i32>,
-    pub output_route_device: Option<i32>,
-    pub input_route_index: Option<i32>,
-    pub input_route_device: Option<i32>,
-    pub output_route_volume: Option<f32>,
-    pub output_route_muted: Option<bool>,
-    pub input_route_volume: Option<f32>,
-    pub input_route_muted: Option<bool>,
+    pub output_route: RouteInfo,
+    pub input_route: RouteInfo,
 }
 
 pub struct DeviceInternal {
@@ -93,14 +109,8 @@ pub struct DeviceInternal {
     pub current_profile_index: Option<u32>,
     pub proxy: pipewire::device::Device,
     pub listener: Option<pipewire::device::DeviceListener>,
-    pub output_route_index: Option<i32>,
-    pub output_route_device: Option<i32>,
-    pub input_route_index: Option<i32>,
-    pub input_route_device: Option<i32>,
-    pub output_route_volume: Option<f32>,
-    pub output_route_muted: Option<bool>,
-    pub input_route_volume: Option<f32>,
-    pub input_route_muted: Option<bool>,
+    pub output_route: RouteInfo,
+    pub input_route: RouteInfo,
     pub has_route_volume: bool,
 }
 
@@ -118,14 +128,8 @@ impl DeviceInternal {
             profiles: self.profiles.clone(),
             current_profile_index: self.current_profile_index,
             has_route_volume: self.has_route_volume,
-            output_route_index: self.output_route_index,
-            output_route_device: self.output_route_device,
-            input_route_index: self.input_route_index,
-            input_route_device: self.input_route_device,
-            output_route_volume: self.output_route_volume,
-            output_route_muted: self.output_route_muted,
-            input_route_volume: self.input_route_volume,
-            input_route_muted: self.input_route_muted,
+            output_route: self.output_route.clone(),
+            input_route: self.input_route.clone(),
         }
     }
 
@@ -143,8 +147,8 @@ impl DeviceInternal {
 
     pub fn get_route_volume(&self, direction: RouteDirection) -> Option<(f32, bool)> {
         match direction {
-            RouteDirection::Output => self.output_route_volume.zip(self.output_route_muted),
-            RouteDirection::Input => self.input_route_volume.zip(self.input_route_muted),
+            RouteDirection::Output => self.output_route.get_volume_state(),
+            RouteDirection::Input => self.input_route.get_volume_state(),
         }
     }
 
@@ -255,37 +259,25 @@ impl Store {
 
         let mut device = DeviceInternal {
             id: global.id,
-            name: name.clone(),
+            name,
             nick,
-            description,
+            description: None,
             device_type,
             bus: None,
             form_factor: None,
-            nodes: self
-                .nodes
-                .values()
-                .filter(|n| n.device_id == Some(global.id))
-                .map(|n| n.id)
-                .collect(),
+            nodes: Vec::new(),
             profiles: Vec::new(),
             current_profile_index: None,
             proxy,
             listener: None,
-            output_route_index: None,
-            output_route_device: None,
-            input_route_index: None,
-            input_route_device: None,
-            output_route_volume: None,
-            output_route_muted: None,
-            input_route_volume: None,
-            input_route_muted: None,
+            output_route: RouteInfo::default(),
+            input_route: RouteInfo::default(),
             has_route_volume: false,
         };
 
         self.setup_device_monitoring(&mut device, store_rc, graph_tx);
 
         self.devices.insert(global.id, device);
-        debug!("Added device {}: '{}'", global.id, name);
         Ok(())
     }
 
@@ -481,34 +473,34 @@ impl Store {
                 let mut cache_updated = false;
 
                 if direction == 1 {
-                    device.output_route_index = Some(index);
-                    device.output_route_device = Some(device_num);
+                    device.output_route.index = Some(index);
+                    device.output_route.device = Some(device_num);
 
                     if let Some(volume) = route_volume {
-                        if device.output_route_volume != Some(volume) {
-                            device.output_route_volume = Some(volume);
+                        if device.output_route.volume != Some(volume) {
+                            device.output_route.volume = Some(volume);
                             cache_updated = true;
                         }
                     }
                     if let Some(muted) = route_muted {
-                        if device.output_route_muted != Some(muted) {
-                            device.output_route_muted = Some(muted);
+                        if device.output_route.muted != Some(muted) {
+                            device.output_route.muted = Some(muted);
                             cache_updated = true;
                         }
                     }
                 } else if direction == 0 {
-                    device.input_route_index = Some(index);
-                    device.input_route_device = Some(device_num);
+                    device.input_route.index = Some(index);
+                    device.input_route.device = Some(device_num);
 
                     if let Some(volume) = route_volume {
-                        if device.input_route_volume != Some(volume) {
-                            device.input_route_volume = Some(volume);
+                        if device.input_route.volume != Some(volume) {
+                            device.input_route.volume = Some(volume);
                             cache_updated = true;
                         }
                     }
                     if let Some(muted) = route_muted {
-                        if device.input_route_muted != Some(muted) {
-                            device.input_route_muted = Some(muted);
+                        if device.input_route.muted != Some(muted) {
+                            device.input_route.muted = Some(muted);
                             cache_updated = true;
                         }
                     }
@@ -779,14 +771,14 @@ impl Store {
 
             match dir {
                 RouteDirection::Output => {
-                    if device.output_route_index.is_some() {
+                    if device.output_route.is_available() {
                         Some(dir)
                     } else {
                         None
                     }
                 }
                 RouteDirection::Input => {
-                    if device.input_route_index.is_some() {
+                    if device.input_route.is_available() {
                         Some(dir)
                     } else {
                         None
@@ -805,14 +797,8 @@ impl Store {
                     .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
                 match direction {
-                    RouteDirection::Output => (
-                        device.output_route_index.unwrap(),
-                        device.output_route_device.unwrap(),
-                    ),
-                    RouteDirection::Input => (
-                        device.input_route_index.unwrap(),
-                        device.input_route_device.unwrap(),
-                    ),
+                    RouteDirection::Output => device.output_route.get_route_params().unwrap(),
+                    RouteDirection::Input => device.input_route.get_route_params().unwrap(),
                 }
             };
 
@@ -843,15 +829,14 @@ impl Store {
                 .devices
                 .get_mut(&device_id)
                 .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
-
             device.proxy.set_param(ParamType::Route, 0, pod_ref);
 
             match direction {
                 RouteDirection::Output => {
-                    device.output_route_volume = Some(volume);
+                    device.output_route.volume = Some(volume);
                 }
                 RouteDirection::Input => {
-                    device.input_route_volume = Some(volume);
+                    device.input_route.volume = Some(volume);
                 }
             }
         } else {
@@ -887,14 +872,14 @@ impl Store {
 
             match dir {
                 RouteDirection::Output => {
-                    if device.output_route_index.is_some() {
+                    if device.output_route.is_available() {
                         Some(dir)
                     } else {
                         None
                     }
                 }
                 RouteDirection::Input => {
-                    if device.input_route_index.is_some() {
+                    if device.input_route.is_available() {
                         Some(dir)
                     } else {
                         None
@@ -913,14 +898,8 @@ impl Store {
                     .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
                 match direction {
-                    RouteDirection::Output => (
-                        device.output_route_index.unwrap(),
-                        device.output_route_device.unwrap(),
-                    ),
-                    RouteDirection::Input => (
-                        device.input_route_index.unwrap(),
-                        device.input_route_device.unwrap(),
-                    ),
+                    RouteDirection::Output => device.output_route.get_route_params().unwrap(),
+                    RouteDirection::Input => device.input_route.get_route_params().unwrap(),
                 }
             };
 
@@ -943,10 +922,10 @@ impl Store {
 
             match direction {
                 RouteDirection::Output => {
-                    device.output_route_muted = Some(mute);
+                    device.output_route.muted = Some(mute);
                 }
                 RouteDirection::Input => {
-                    device.input_route_muted = Some(mute);
+                    device.input_route.muted = Some(mute);
                 }
             }
         } else {

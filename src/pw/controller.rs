@@ -133,8 +133,8 @@ impl Controller {
         direction: RouteDirection,
     ) -> Option<(f32, bool)> {
         match direction {
-            RouteDirection::Output => device.output_route_volume.zip(device.output_route_muted),
-            RouteDirection::Input => device.input_route_volume.zip(device.input_route_muted),
+            RouteDirection::Output => device.output_route.get_volume_state(),
+            RouteDirection::Input => device.input_route.get_volume_state(),
         }
     }
 
@@ -243,14 +243,14 @@ impl Controller {
                 if device.has_route_volume {
                     let target_direction = match node.node_type {
                         NodeType::Sink => {
-                            if device.output_route_index.is_some() {
+                            if device.output_route.is_available() {
                                 Some(RouteDirection::Output)
                             } else {
                                 None
                             }
                         }
                         NodeType::Source => {
-                            if device.input_route_index.is_some() {
+                            if device.input_route.is_available() {
                                 Some(RouteDirection::Input)
                             } else {
                                 None
@@ -308,14 +308,14 @@ impl Controller {
                 if device.has_route_volume {
                     let target_direction = match node.node_type {
                         NodeType::Sink => {
-                            if device.output_route_index.is_some() {
+                            if device.output_route.is_available() {
                                 Some(RouteDirection::Output)
                             } else {
                                 None
                             }
                         }
                         NodeType::Source => {
-                            if device.input_route_index.is_some() {
+                            if device.input_route.is_available() {
                                 Some(RouteDirection::Input)
                             } else {
                                 None
