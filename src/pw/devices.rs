@@ -362,6 +362,24 @@ impl Store {
                                             }
                                         }
 
+                                        if let Some(description) =
+                                            props.get("device.description").map(str::to_string)
+                                        {
+                                            if device.description.as_ref() != Some(&description) {
+                                                device.description = Some(description);
+                                                updated = true;
+                                            }
+                                        }
+
+                                        if let Some(nick) =
+                                            props.get("device.nick").map(str::to_string)
+                                        {
+                                            if device.nick.as_ref() != Some(&nick) {
+                                                device.nick = Some(nick);
+                                                updated = true;
+                                            }
+                                        }
+
                                         updated
                                     } else {
                                         false
