@@ -339,12 +339,14 @@ impl App {
             false
         };
 
+        let device_name = self.controller.get_device_name(node.device_id.unwrap_or(0));
+
         let option = menu
             .show_device_options(
                 menu_command,
                 icon_type,
                 spaces,
-                node.description.as_ref().unwrap_or(&node.name),
+                &device_name,
                 node.is_default,
                 is_output,
                 has_profiles,
@@ -516,6 +518,8 @@ impl App {
         is_output: bool,
         last_action: Option<VolumeMenuOptions>,
     ) -> Result<(bool, Option<VolumeMenuOptions>)> {
+        let device_name = self.controller.get_device_name(node.device_id.unwrap_or(0));
+
         let option = menu
             .show_volume_menu(
                 menu_command,
@@ -524,6 +528,7 @@ impl App {
                 node,
                 is_output,
                 last_action,
+                &device_name,
             )
             .await?;
 

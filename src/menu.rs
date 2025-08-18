@@ -445,6 +445,7 @@ impl Menu {
         Ok(None)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn show_volume_menu(
         &self,
         launcher_command: &Option<String>,
@@ -453,6 +454,7 @@ impl Menu {
         node: &Node,
         is_output_menu: bool,
         last_action: Option<VolumeMenuOptions>,
+        device_name: &str,
     ) -> Result<Option<VolumeMenuOptions>> {
         let mut options = Vec::new();
 
@@ -502,7 +504,7 @@ impl Menu {
         let volume_percent = node.volume.percent();
         let hint = t!(
             "menus.volume.hint",
-            device_name = node.description.as_ref().unwrap_or(&node.name),
+            device_name = device_name,
             volume = volume_percent
         );
 
