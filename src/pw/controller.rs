@@ -480,7 +480,13 @@ impl Controller {
             .graph()
             .devices
             .get(&device_id)
-            .map(|d| d.description.as_ref().unwrap_or(&d.name).clone())
+            .map(|d| {
+                d.nick
+                    .as_ref()
+                    .or(d.description.as_ref())
+                    .unwrap_or(&d.name)
+                    .clone()
+            })
             .unwrap_or_else(|| "Unknown Device".to_string())
     }
 
