@@ -1,5 +1,4 @@
 _version: 2
-
 menus:
   main:
     options:
@@ -15,41 +14,41 @@ menus:
           de: "Eingabegeräte"
   output:
     hint:
-      en: "Select Output Device"
-      fr: "Sélectionner périphérique de sortie"
+      en: "Choose Output Device"
+      fr: "Sélectionner un périphérique de sortie"
       de: "Ausgabegerät auswählen"
     options:
       refresh:
         name:
-          en: "Refresh Outputs"
-          fr: "Rafraîchir sorties"
-          de: "Ausgaben aktualisieren"
+          en: "Refresh"
+          fr: "Actualiser"
+          de: "Aktualisieren"
       device:
         name:
-          en: "Select Output Device"
-          fr: "Sélectionner périphérique de sortie"
+          en: "Choose Output Device"
+          fr: "Sélectionner un périphérique de sortie"
           de: "Ausgabegerät auswählen"
   input:
     hint:
-      en: "Select Input Device"
-      fr: "Sélectionner périphérique d'entrée"
+      en: "Choose Input Device"
+      fr: "Sélectionner un périphérique d'entrée"
       de: "Eingabegerät auswählen"
     options:
       refresh:
         name:
-          en: "Refresh Inputs"
-          fr: "Rafraîchir entrées"
-          de: "Eingaben aktualisieren"
+          en: "Refresh"
+          fr: "Actualiser"
+          de: "Aktualisieren"
       device:
         name:
-          en: "Select Input Device"
-          fr: "Sélectionner périphérique d'entrée"
+          en: "Choose Input Device"
+          fr: "Sélectionner un périphérique d'entrée"
           de: "Eingabegerät auswählen"
   device:
     hint:
-      en: "Manage %{device_name}"
-      fr: "Gérer %{device_name}"
-      de: "%{device_name} verwalten"
+      en: "Configure %{device_name}"
+      fr: "Configurer %{device_name}"
+      de: "%{device_name} konfigurieren"
     options:
       set_default:
         name:
@@ -70,85 +69,84 @@ menus:
     hint:
       en: "Switch profile for %{device_name}"
       fr: "Changer le profil de %{device_name}"
-      de: "Profil für %{device_name} ändern"
+      de: "Profil für %{device_name} wechseln"
   volume:
     hint:
-      en: "Ajust volume for %{device_name} [%{volume}%]"
+      en: "Adjust volume for %{device_name} [%{volume}%]"
       fr: "Ajuster le volume de %{device_name} [%{volume}%]"
-      de: "Lautstärke für %{device_name} anpassen [%{volume}%]"
+      de: "Lautstärke von %{device_name} anpassen [%{volume}%]"
     options:
       increase:
         name:
-          en: "Increase Volume (+5%)"
-          fr: "Augmenter volume (+5%)"
+          en: "Volume Up (+5%)"
+          fr: "Augmenter le volume (+5%)"
           de: "Lautstärke erhöhen (+5%)"
       decrease:
         name:
-          en: "Decrease Volume (-5%)"
-          fr: "Diminuer volume (-5%)"
+          en: "Volume Down (-5%)"
+          fr: "Diminuer le volume (-5%)"
           de: "Lautstärke verringern (-5%)"
       mute:
         name:
           en: "Mute"
-          fr: "Couper le son"
-          de: "Stummschalten"
+          fr: "Muet"
+          de: "Ton aus"
       unmute:
         name:
           en: "Unmute"
-          fr: "Activer le son"
-          de: "Stummschaltung aufheben"
-
+          fr: "Rétablir le son"
+          de: "Ton an"
 notifications:
   pw:
     initialized:
-      en: "PipeWire audio system initialized"
+      en: "PipeWire audio system ready"
       fr: "Système audio PipeWire initialisé"
-      de: "PipeWire-Audiosystem initialisiert"
+      de: "PipeWire-Audiosystem wurde initialisiert"
     refreshed:
-      en: "Audio system refreshed"
-      fr: "Système audio rafraîchi"
-      de: "Audiosystem aktualisiert"
+      en: "Audio system updated"
+      fr: "Système audio actualisé"
+      de: "Audiosystem wurde aktualisiert"
     outputs_refreshed:
-      en: "Output devices refreshed"
-      fr: "Périphériques de sortie rafraîchis"
-      de: "Ausgabegeräte aktualisiert"
+      en: "Output devices updated"
+      fr: "Périphériques de sortie actualisés"
+      de: "Ausgabegeräte wurden aktualisiert"
     inputs_refreshed:
-      en: "Input devices refreshed"
-      fr: "Périphériques d'entrée rafraîchis"
-      de: "Eingabegeräte aktualisiert"
+      en: "Input devices updated"
+      fr: "Périphériques d'entrée actualisés"
+      de: "Eingabegeräte wurden aktualisiert"
     main_menu_exited:
-      en: "Main menu exited"
-      fr: "Menu principal fermé"
-      de: "Hauptmenü beendet"
+      en: "Exited main menu"
+      fr: "Menu principal quitté"
+      de: "Hauptmenü wurde verlassen"
     output_menu_exited:
-      en: "Output menu exited"
-      fr: "Menu des sorties fermé"
-      de: "Ausgabemenü beendet"
+      en: "Exited output devices menu"
+      fr: "Menu des périphériques de sortie quitté"
+      de: "Menü der Ausgabegeräte wurde verlassen"
     input_menu_exited:
-      en: "Input menu exited"
-      fr: "Menu des entrées fermé"
-      de: "Eingabemenü beendet"
+      en: "Exited input devices menu"
+      fr: "Menu des périphériques d'entrée quitté"
+      de: "Menü der Eingabegeräte wurde verlassen"
     default_set:
-      en: "Default %{device_type} set to %{device_name}"
-      fr: "%{device_type} par défaut défini à %{device_name}"
-      de: "Standard-%{device_type} auf %{device_name} gesetzt"
+      en: "%{device_type} default: %{device_name}"
+      fr: "%{device_type} par défaut : %{device_name}"
+      de: "Standard-%{device_type} ist jetzt %{device_name}"
     volume_changed:
-      en: "Volume for %{device_name} set to %{volume}%"
-      fr: "Volume pour %{device_name} défini à %{volume}%"
-      de: "Lautstärke für %{device_name} auf %{volume}% gesetzt"
+      en: "%{device_name} volume: %{volume}%"
+      fr: "Volume de %{device_name} : %{volume}%"
+      de: "Lautstärke von %{device_name} auf %{volume}% eingestellt"
     volume_set:
-      en: "Volume set to %{volume}%"
-      fr: "Volume défini à %{volume}%"
-      de: "Lautstärke auf %{volume}% gesetzt"
+      en: "Volume: %{volume}%"
+      fr: "Volume : %{volume}%"
+      de: "Lautstärke: %{volume}%"
     device_muted:
       en: "%{device_name} muted"
-      fr: "Son coupé pour %{device_name}"
-      de: "%{device_name} stummgeschaltet"
+      fr: "%{device_name} en mode muet"
+      de: "%{device_name} ist stummgeschaltet"
     device_unmuted:
       en: "%{device_name} unmuted"
-      fr: "Son activé pour %{device_name}"
-      de: "Stummschaltung für %{device_name} aufgehoben"
+      fr: "%{device_name} : son rétabli"
+      de: "%{device_name} ist nicht mehr stummgeschaltet"
     profile_switched:
-      en: "%{profile_name} applied to %{device_name}"
+      en: "%{device_name}: %{profile_name} active"
       fr: "Profil %{profile_name} appliqué à %{device_name}"
-      de: "Profil %{profile_name} auf %{device_name} angewendet"
+      de: "Profil %{profile_name} für %{device_name} aktiviert"
