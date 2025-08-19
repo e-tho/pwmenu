@@ -73,9 +73,9 @@ menus:
       de: "Profil für %{device_name} ändern"
   volume:
     hint:
-      en: "%{device_name} [%{volume}%]"
-      fr: "%{device_name} [%{volume}%]"
-      de: "%{device_name} [%{volume}%]"
+      en: "Ajust volume for %{device_name} [%{volume}%]"
+      fr: "Ajuster le volume de %{device_name} [%{volume}%]"
+      de: "Lautstärke für %{device_name} anpassen [%{volume}%]"
     options:
       increase:
         name:
