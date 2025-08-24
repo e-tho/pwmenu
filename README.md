@@ -29,7 +29,6 @@
 ### Runtime
 
 - [`pipewire`](https://pipewire.org) – PipeWire daemon
-- [`wireplumber`](https://gitlab.freedesktop.org/pipewire/wireplumber) – PipeWire session manager
 - A launcher with `stdin` mode support
 
 #### Optional
