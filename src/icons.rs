@@ -397,14 +397,6 @@ impl Icons {
             }
         }
 
-        if device_info.is_muted {
-            let icon_key = match device_info.node_type {
-                NodeType::Source => "input_mute",
-                _ => "output_mute",
-            };
-            return self.get_icon(icon_key, icon_type);
-        }
-
         if let Some(form_factor) = &device_info.form_factor {
             return self.get_icon(form_factor, icon_type);
         }

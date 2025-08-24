@@ -520,6 +520,12 @@ impl App {
     ) -> Result<(bool, Option<VolumeMenuOptions>)> {
         let device_name = self.controller.get_device_name(node.device_id.unwrap_or(0));
 
+        let volume_display = if node.volume.muted {
+            t!("menus.volume.muted").to_string()
+        } else {
+            format!("{}%", node.volume.percent())
+        };
+
         let option = menu
             .show_volume_menu(
                 menu_command,
@@ -529,6 +535,7 @@ impl App {
                 is_output,
                 last_action,
                 &device_name,
+                &volume_display,
             )
             .await?;
 

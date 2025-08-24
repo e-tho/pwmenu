@@ -72,9 +72,13 @@ menus:
       de: "Profil für %{device_name} wechseln"
   volume:
     hint:
-      en: "Adjust volume for %{device_name} [%{volume}%]"
-      fr: "Ajuster le volume de %{device_name} [%{volume}%]"
-      de: "Lautstärke von %{device_name} anpassen [%{volume}%]"
+      en: "Adjust volume for %{device_name} [%{volume}]"
+      fr: "Ajuster le volume de %{device_name} [%{volume}]"
+      de: "Lautstärke von %{device_name} anpassen [%{volume}]"
+    muted:
+      en: "Muted"
+      fr: "Muet"
+      de: "Stummgeschaltet"
     options:
       increase:
         name:

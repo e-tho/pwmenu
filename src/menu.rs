@@ -238,7 +238,11 @@ impl Menu {
             display_name.push_str(&format!(" - {port_number}"));
         }
 
-        let volume_str = format!(" [{}%]", node.volume.percent());
+        let volume_str = if node.volume.muted {
+            format!(" [{}]", t!("menus.volume.muted"))
+        } else {
+            format!(" [{}%]", node.volume.percent())
+        };
         display_name.push_str(&volume_str);
 
         if node.is_default {
@@ -455,6 +459,7 @@ impl Menu {
         is_output_menu: bool,
         last_action: Option<VolumeMenuOptions>,
         device_name: &str,
+        volume_display: &str,
     ) -> Result<Option<VolumeMenuOptions>> {
         let mut options = Vec::new();
 
@@ -501,11 +506,10 @@ impl Menu {
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);
-        let volume_percent = node.volume.percent();
         let hint = t!(
             "menus.volume.hint",
             device_name = device_name,
-            volume = volume_percent
+            volume = volume_display
         );
 
         let menu_output =
