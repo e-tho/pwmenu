@@ -177,7 +177,8 @@ impl App {
                 Ok(true)
             }
             Some(OutputMenuOptions::Device(output)) => {
-                self.handle_device_selection(menu, menu_command, &output, icon_type, spaces, true)
+                let _device = self
+                    .handle_device_selection(menu, menu_command, &output, icon_type, spaces, true)
                     .await?;
                 Ok(true)
             }
@@ -239,7 +240,8 @@ impl App {
                 Ok(true)
             }
             Some(InputMenuOptions::Device(input)) => {
-                self.handle_device_selection(menu, menu_command, &input, icon_type, spaces, false)
+                let _device = self
+                    .handle_device_selection(menu, menu_command, &input, icon_type, spaces, true)
                     .await?;
                 Ok(true)
             }
@@ -262,26 +264,27 @@ impl App {
         spaces: usize,
         is_output: bool,
     ) -> Result<Option<Node>> {
-        let cleaned_output = menu.clean_menu_output(output, icon_type);
-
         let nodes = if is_output {
             self.controller.get_output_nodes()
         } else {
             self.controller.get_input_nodes()
         };
 
-        let node_clone = nodes
-            .iter()
-            .find(|node| {
-                let formatted = menu.format_node_display(node, &self.controller, icon_type, spaces);
-                menu.clean_menu_output(&formatted, icon_type) == cleaned_output
-            })
-            .cloned();
-
-        if let Some(node) = node_clone {
-            self.handle_device_menu(menu, menu_command, &node, icon_type, spaces, is_output)
+        for node in &nodes {
+            let base_name = self.controller.get_node_base_name(node);
+            if output.contains(&base_name) {
+                let node_clone = node.clone();
+                self.handle_device_menu(
+                    menu,
+                    menu_command,
+                    &node_clone,
+                    icon_type,
+                    spaces,
+                    is_output,
+                )
                 .await?;
-            return Ok(Some(node));
+                return Ok(Some(node_clone));
+            }
         }
 
         Ok(None)
