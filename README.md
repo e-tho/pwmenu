@@ -12,9 +12,6 @@
 
 ## About
 
-> [!IMPORTANT]
-> Work in progress. Not ready for general use.
-
 `pwmenu` (**P**ipe**W**ire **Menu**) manages audio through your launcher of choice.
 
 ## Dependencies
