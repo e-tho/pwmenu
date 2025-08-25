@@ -134,20 +134,29 @@ pub enum VolumeMenuOptions {
 }
 
 impl VolumeMenuOptions {
-    pub fn from_string(option: &str) -> Option<Self> {
+    pub fn from_string(option: &str, step_percent: u8) -> Option<Self> {
+        let increase_text = t!("menus.volume.options.increase.name", step = step_percent);
+        let decrease_text = t!("menus.volume.options.decrease.name", step = step_percent);
+
         match option {
-            s if s == t!("menus.volume.options.increase.name") => Some(VolumeMenuOptions::Increase),
-            s if s == t!("menus.volume.options.decrease.name") => Some(VolumeMenuOptions::Decrease),
+            s if s == increase_text => Some(VolumeMenuOptions::Increase),
+            s if s == decrease_text => Some(VolumeMenuOptions::Decrease),
             s if s == t!("menus.volume.options.mute.name") => Some(VolumeMenuOptions::Mute),
             s if s == t!("menus.volume.options.unmute.name") => Some(VolumeMenuOptions::Unmute),
             _ => None,
         }
     }
 
-    pub fn to_str(&self) -> Cow<'static, str> {
+    pub fn to_str(&self, step_percent: Option<u8>) -> Cow<'static, str> {
         match self {
-            VolumeMenuOptions::Increase => t!("menus.volume.options.increase.name"),
-            VolumeMenuOptions::Decrease => t!("menus.volume.options.decrease.name"),
+            VolumeMenuOptions::Increase => {
+                let step = step_percent.unwrap_or(5);
+                t!("menus.volume.options.increase.name", step = step)
+            }
+            VolumeMenuOptions::Decrease => {
+                let step = step_percent.unwrap_or(5);
+                t!("menus.volume.options.decrease.name", step = step)
+            }
             VolumeMenuOptions::Mute => t!("menus.volume.options.mute.name"),
             VolumeMenuOptions::Unmute => t!("menus.volume.options.unmute.name"),
         }
@@ -448,6 +457,7 @@ impl Menu {
         last_action: Option<VolumeMenuOptions>,
         device_name: &str,
         volume_display: &str,
+        step_percent: u8,
     ) -> Result<Option<VolumeMenuOptions>> {
         let mut options = Vec::new();
 
@@ -464,16 +474,34 @@ impl Menu {
 
         match last_action {
             Some(VolumeMenuOptions::Decrease) => {
-                options.push((decrease_key, VolumeMenuOptions::Decrease.to_str()));
-                options.push((increase_key, VolumeMenuOptions::Increase.to_str()));
+                options.push((
+                    decrease_key,
+                    VolumeMenuOptions::Decrease.to_str(Some(step_percent)),
+                ));
+                options.push((
+                    increase_key,
+                    VolumeMenuOptions::Increase.to_str(Some(step_percent)),
+                ));
             }
             Some(VolumeMenuOptions::Increase) => {
-                options.push((increase_key, VolumeMenuOptions::Increase.to_str()));
-                options.push((decrease_key, VolumeMenuOptions::Decrease.to_str()));
+                options.push((
+                    increase_key,
+                    VolumeMenuOptions::Increase.to_str(Some(step_percent)),
+                ));
+                options.push((
+                    decrease_key,
+                    VolumeMenuOptions::Decrease.to_str(Some(step_percent)),
+                ));
             }
             _ => {
-                options.push((increase_key, VolumeMenuOptions::Increase.to_str()));
-                options.push((decrease_key, VolumeMenuOptions::Decrease.to_str()));
+                options.push((
+                    increase_key,
+                    VolumeMenuOptions::Increase.to_str(Some(step_percent)),
+                ));
+                options.push((
+                    decrease_key,
+                    VolumeMenuOptions::Decrease.to_str(Some(step_percent)),
+                ));
             }
         }
 
@@ -483,14 +511,14 @@ impl Menu {
             } else {
                 "input_unmute"
             };
-            options.push((unmute_key, VolumeMenuOptions::Unmute.to_str()));
+            options.push((unmute_key, VolumeMenuOptions::Unmute.to_str(None)));
         } else {
             let mute_key = if is_output_menu {
                 "output_mute"
             } else {
                 "input_mute"
             };
-            options.push((mute_key, VolumeMenuOptions::Mute.to_str()));
+            options.push((mute_key, VolumeMenuOptions::Mute.to_str(None)));
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);
@@ -505,7 +533,10 @@ impl Menu {
 
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
-            return Ok(VolumeMenuOptions::from_string(&cleaned_output));
+            return Ok(VolumeMenuOptions::from_string(
+                &cleaned_output,
+                step_percent,
+            ));
         }
 
         Ok(None)

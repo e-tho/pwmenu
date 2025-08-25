@@ -16,13 +16,12 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-const VOLUME_STEP: f32 = 0.05; // 5% volume change per step
-
 pub struct App {
     pub running: bool,
     controller: Controller,
     log_sender: UnboundedSender<String>,
     notification_manager: Arc<NotificationManager>,
+    volume_step: f32,
 }
 
 impl App {
@@ -30,6 +29,7 @@ impl App {
         _menu: Menu,
         log_sender: UnboundedSender<String>,
         icons: Arc<Icons>,
+        volume_step: f32,
     ) -> Result<Self> {
         let controller = Controller::new(log_sender.clone()).await?;
         let notification_manager = Arc::new(NotificationManager::new(icons.clone()));
@@ -41,6 +41,7 @@ impl App {
             controller,
             log_sender,
             notification_manager,
+            volume_step,
         })
     }
 
@@ -528,6 +529,7 @@ impl App {
             format!("{}%", node.volume.percent())
         };
 
+        let step_percent = (self.volume_step * 100.0).round() as u8;
         let option = menu
             .show_volume_menu(
                 menu_command,
@@ -538,16 +540,17 @@ impl App {
                 last_action,
                 &device_name,
                 &volume_display,
+                step_percent,
             )
             .await?;
 
         if let Some(selected_option) = option {
             match selected_option {
                 VolumeMenuOptions::Increase => {
-                    self.perform_volume_change(node, VOLUME_STEP).await?;
+                    self.perform_volume_change(node, self.volume_step).await?;
                 }
                 VolumeMenuOptions::Decrease => {
-                    self.perform_volume_change(node, -VOLUME_STEP).await?;
+                    self.perform_volume_change(node, -self.volume_step).await?;
                 }
                 VolumeMenuOptions::Mute => {
                     self.perform_mute_toggle(node, true).await?;

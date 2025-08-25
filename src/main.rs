@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use clap::{builder::EnumValueParser, Arg, Command};
+use clap::{builder::EnumValueParser, value_parser, Arg, Command};
 use pwmenu::{app::App, icons::Icons, launcher::LauncherType, menu::Menu};
 use rust_i18n::{i18n, set_locale};
 use std::{env, sync::Arc};
@@ -75,6 +75,14 @@ async fn main() -> Result<()> {
                 .possible_values(["outputs", "inputs"])
                 .help("Start in the specified root menu"),
         )
+        .arg(
+            Arg::new("volume_step")
+                .long("volume-step")
+                .takes_value(true)
+                .value_parser(value_parser!(u8).range(1..=25))
+                .default_value("5")
+                .help("Volume adjustment step as percentage (1-25)"),
+        )
         .get_matches();
 
     let launcher_type: LauncherType = matches
@@ -98,6 +106,8 @@ async fn main() -> Result<()> {
 
     let (log_sender, mut log_receiver) = unbounded_channel::<String>();
 
+    let volume_step = matches.get_one::<u8>("volume_step").copied().unwrap() as f32 / 100.0;
+
     tokio::spawn(async move {
         while let Some(log) = log_receiver.recv().await {
             println!("LOG: {log}");
@@ -112,12 +122,14 @@ async fn main() -> Result<()> {
         log_sender,
         icons,
         root_menu,
+        volume_step,
     )
     .await?;
 
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_app_loop(
     menu: &Menu,
     command_str: &Option<String>,
@@ -126,8 +138,9 @@ async fn run_app_loop(
     log_sender: tokio::sync::mpsc::UnboundedSender<String>,
     icons: Arc<Icons>,
     root_menu: Option<String>,
+    volume_step: f32,
 ) -> Result<()> {
-    let mut app = App::new(menu.clone(), log_sender.clone(), icons.clone()).await?;
+    let mut app = App::new(menu.clone(), log_sender.clone(), icons.clone(), volume_step).await?;
 
     let result = if let Some(ref menu_name) = root_menu {
         app.wait_for_initialization().await?;

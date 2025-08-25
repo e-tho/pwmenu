@@ -82,14 +82,14 @@ menus:
     options:
       increase:
         name:
-          en: "Volume Up (+5%)"
-          fr: "Augmenter le volume (+5%)"
-          de: "Lautstärke erhöhen (+5%)"
+          en: "Volume Up (+%{step}%)"
+          fr: "Augmenter le volume (+%{step}%)"
+          de: "Lautstärke erhöhen (+%{step}%)"
       decrease:
         name:
-          en: "Volume Down (-5%)"
-          fr: "Diminuer le volume (-5%)"
-          de: "Lautstärke verringern (-5%)"
+          en: "Volume Down (-%{step}%)"
+          fr: "Diminuer le volume (-%{step}%)"
+          de: "Lautstärke verringern (-%{step}%)"
       mute:
         name:
           en: "Mute"
