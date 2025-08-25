@@ -158,29 +158,36 @@ impl App {
         icon_type: &str,
         spaces: usize,
     ) -> Result<bool> {
-        match menu
-            .show_output_menu(menu_command, &self.controller, icon_type, spaces)
-            .await?
-        {
-            Some(OutputMenuOptions::RefreshList) => {
-                try_send_log!(
-                    self.log_sender,
-                    t!("notifications.pw.outputs_refreshed").to_string()
-                );
-                try_send_notification!(
-                    self.notification_manager,
-                    Some(t!("notifications.pw.outputs_refreshed").to_string()),
-                    None,
-                    Some("refresh"),
-                    None
-                );
-                Ok(true)
-            }
-            Some(OutputMenuOptions::Device(output)) => {
-                let _device = self
-                    .handle_device_selection(menu, menu_command, &output, icon_type, spaces, true)
-                    .await?;
-                Ok(true)
+        let nodes = self.controller.get_output_nodes();
+        let menu_result = menu
+            .show_output_menu(menu_command, &nodes, &self.controller, icon_type, spaces)
+            .await?;
+
+        match menu_result {
+            Some(selection) => {
+                let refresh_text = OutputMenuOptions::RefreshList.to_str();
+                if selection == refresh_text.as_ref() {
+                    try_send_log!(
+                        self.log_sender,
+                        t!("notifications.pw.outputs_refreshed").to_string()
+                    );
+                    try_send_notification!(
+                        self.notification_manager,
+                        Some(t!("notifications.pw.outputs_refreshed").to_string()),
+                        None,
+                        Some("refresh"),
+                        None
+                    );
+                    Ok(true)
+                } else {
+                    let selected_node =
+                        self.handle_device_selection(&nodes, &selection, menu, icon_type, spaces)?;
+                    if let Some(node) = selected_node {
+                        self.handle_device_menu(menu, menu_command, &node, icon_type, spaces, true)
+                            .await?;
+                    }
+                    Ok(true)
+                }
             }
             None => {
                 try_send_log!(
@@ -221,29 +228,36 @@ impl App {
         icon_type: &str,
         spaces: usize,
     ) -> Result<bool> {
-        match menu
-            .show_input_menu(menu_command, &self.controller, icon_type, spaces)
-            .await?
-        {
-            Some(InputMenuOptions::RefreshList) => {
-                try_send_log!(
-                    self.log_sender,
-                    t!("notifications.pw.inputs_refreshed").to_string()
-                );
-                try_send_notification!(
-                    self.notification_manager,
-                    Some(t!("notifications.pw.inputs_refreshed").to_string()),
-                    None,
-                    Some("refresh"),
-                    None
-                );
-                Ok(true)
-            }
-            Some(InputMenuOptions::Device(input)) => {
-                let _device = self
-                    .handle_device_selection(menu, menu_command, &input, icon_type, spaces, true)
-                    .await?;
-                Ok(true)
+        let nodes = self.controller.get_input_nodes();
+        let menu_result = menu
+            .show_input_menu(menu_command, &nodes, &self.controller, icon_type, spaces)
+            .await?;
+
+        match menu_result {
+            Some(selection) => {
+                let refresh_text = InputMenuOptions::RefreshList.to_str();
+                if selection == refresh_text.as_ref() {
+                    try_send_log!(
+                        self.log_sender,
+                        t!("notifications.pw.inputs_refreshed").to_string()
+                    );
+                    try_send_notification!(
+                        self.notification_manager,
+                        Some(t!("notifications.pw.inputs_refreshed").to_string()),
+                        None,
+                        Some("refresh"),
+                        None
+                    );
+                    Ok(true)
+                } else {
+                    let selected_node =
+                        self.handle_device_selection(&nodes, &selection, menu, icon_type, spaces)?;
+                    if let Some(node) = selected_node {
+                        self.handle_device_menu(menu, menu_command, &node, icon_type, spaces, true)
+                            .await?;
+                    }
+                    Ok(true)
+                }
             }
             None => {
                 try_send_log!(
@@ -255,35 +269,20 @@ impl App {
         }
     }
 
-    async fn handle_device_selection(
-        &mut self,
+    fn handle_device_selection(
+        &self,
+        nodes: &[Node],
+        selection: &str,
         menu: &Menu,
-        menu_command: &Option<String>,
-        output: &str,
         icon_type: &str,
         spaces: usize,
-        is_output: bool,
     ) -> Result<Option<Node>> {
-        let nodes = if is_output {
-            self.controller.get_output_nodes()
-        } else {
-            self.controller.get_input_nodes()
-        };
+        for node in nodes {
+            let formatted = menu.format_node_display(node, &self.controller, icon_type, spaces);
+            let cleaned_formatted = menu.clean_menu_output(&formatted, icon_type);
 
-        for node in &nodes {
-            let base_name = self.controller.get_node_base_name(node);
-            if output.contains(&base_name) {
-                let node_clone = node.clone();
-                self.handle_device_menu(
-                    menu,
-                    menu_command,
-                    &node_clone,
-                    icon_type,
-                    spaces,
-                    is_output,
-                )
-                .await?;
-                return Ok(Some(node_clone));
+            if cleaned_formatted == selection {
+                return Ok(Some(node.clone()));
             }
         }
 

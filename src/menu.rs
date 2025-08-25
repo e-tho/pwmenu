@@ -295,19 +295,18 @@ impl Menu {
     pub async fn show_output_menu(
         &self,
         launcher_command: &Option<String>,
+        nodes: &[Node],
         controller: &Controller,
         icon_type: &str,
         spaces: usize,
-    ) -> Result<Option<OutputMenuOptions>> {
+    ) -> Result<Option<String>> {
         let refresh_text = OutputMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
 
         let mut input = self.get_icon_text(options_start, icon_type, spaces);
 
-        let output_nodes = controller.get_output_nodes();
-
-        for node in output_nodes {
-            let node_display = self.format_node_display(&node, controller, icon_type, spaces);
+        for node in nodes {
+            let node_display = self.format_node_display(node, controller, icon_type, spaces);
             input.push_str(&format!("\n{node_display}"));
         }
 
@@ -317,12 +316,7 @@ impl Menu {
 
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
-
-            if cleaned_output == refresh_text.as_ref() {
-                return Ok(Some(OutputMenuOptions::RefreshList));
-            } else {
-                return Ok(Some(OutputMenuOptions::Device(cleaned_output)));
-            }
+            return Ok(Some(cleaned_output));
         }
 
         Ok(None)
@@ -331,19 +325,18 @@ impl Menu {
     pub async fn show_input_menu(
         &self,
         launcher_command: &Option<String>,
+        nodes: &[Node],
         controller: &Controller,
         icon_type: &str,
         spaces: usize,
-    ) -> Result<Option<InputMenuOptions>> {
+    ) -> Result<Option<String>> {
         let refresh_text = InputMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
 
         let mut input = self.get_icon_text(options_start, icon_type, spaces);
 
-        let input_nodes = controller.get_input_nodes();
-
-        for node in input_nodes {
-            let node_display = self.format_node_display(&node, controller, icon_type, spaces);
+        for node in nodes {
+            let node_display = self.format_node_display(node, controller, icon_type, spaces);
             input.push_str(&format!("\n{node_display}"));
         }
 
@@ -353,12 +346,7 @@ impl Menu {
 
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
-
-            if cleaned_output == refresh_text.as_ref() {
-                return Ok(Some(InputMenuOptions::RefreshList));
-            } else {
-                return Ok(Some(InputMenuOptions::Device(cleaned_output)));
-            }
+            return Ok(Some(cleaned_output));
         }
 
         Ok(None)
