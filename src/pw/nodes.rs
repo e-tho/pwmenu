@@ -182,7 +182,21 @@ impl Store {
                                        return;
                                    }
                                };
-                               store_borrow.update_node_param(node_id, actual_pod)
+                               let result = store_borrow.update_node_param(node_id, actual_pod);
+
+                               if result {
+                                   if let Some(node) = store_borrow.nodes.get(&node_id) {
+                                       if let Some(device_id) = node.device_id {
+                                           if let Some(device) = store_borrow.devices.get(&device_id) {
+                                               if device.has_route_volume {
+                                                   device.proxy.enum_params(0, Some(ParamType::Route), 0, u32::MAX);
+                                               }
+                                           }
+                                       }
+                                   }
+                               }
+
+                               result
                            };
                            if updated {
                                crate::pw::graph::update_graph(&upgraded_store_rc, &graph_tx);
