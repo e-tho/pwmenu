@@ -199,6 +199,18 @@ impl Icons {
             IconDefinition::simple("microphone-sensitivity-high-symbolic"),
         );
 
+        font_icons.insert("output_volume_overamplified", '\u{f1120}');
+        xdg_icons.insert(
+            "output_volume_overamplified",
+            IconDefinition::simple("audio-volume-overamplified-symbolic"),
+        );
+
+        font_icons.insert("input_volume_overamplified", '\u{f1120}');
+        xdg_icons.insert(
+            "input_volume_overamplified",
+            IconDefinition::simple("microphone-sensitivity-high-symbolic"),
+        );
+
         font_icons.insert("analog", '\u{f1543}');
         xdg_icons.insert("analog", IconDefinition::simple("audio-card-symbolic"));
 

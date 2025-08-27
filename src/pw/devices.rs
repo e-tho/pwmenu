@@ -818,7 +818,7 @@ impl Store {
                 }
             };
 
-            let raw_volume = VolumeResolver::apply_inverse_cubic_scaling(volume.clamp(0.0, 1.0));
+            let raw_volume = VolumeResolver::apply_inverse_cubic_scaling(volume.clamp(0.0, 2.0));
 
             let buffer = self.build_route_parameter_pod(route_index, route_device, |builder| {
                 builder

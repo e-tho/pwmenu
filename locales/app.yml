@@ -142,6 +142,10 @@ notifications:
       en: "Volume: %{volume}%"
       fr: "Volume : %{volume}%"
       de: "Lautstärke: %{volume}%"
+    volume_overamplified_set:
+      en: "Overamplified Volume: %{volume}%"
+      fr: "Volume suramplifiè : %{volume}%"
+      de: "Überverstärkte Lautstärke: %{volume}%"
     device_muted:
       en: "%{device_name} muted"
       fr: "%{device_name} en mode muet"

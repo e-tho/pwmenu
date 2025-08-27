@@ -37,7 +37,7 @@ pub struct Volume {
 impl Volume {
     pub fn new(linear: f32, muted: bool) -> Self {
         Self {
-            linear: linear.clamp(0.0, 1.0),
+            linear: linear.clamp(0.0, 2.0),
             muted,
         }
     }

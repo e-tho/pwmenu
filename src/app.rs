@@ -638,7 +638,7 @@ impl App {
             .ok_or_else(|| anyhow!("Node {node_id} not found"))?;
 
         let current = current_node.volume.linear;
-        let new_volume = (current + delta).clamp(0.0, 1.0);
+        let new_volume = (current + delta).clamp(0.0, 2.0);
 
         self.controller.set_volume(node.id, new_volume).await?;
 

@@ -81,18 +81,22 @@ impl NotificationManager {
                 _ => "output_mute",
             }
         } else {
-            let volume_level = if volume_percent > 70 {
+            let volume_level = if volume_percent > 100 {
+                "overamplified"
+            } else if volume_percent > 67 {
                 "high"
-            } else if volume_percent > 30 {
+            } else if volume_percent > 33 {
                 "medium"
             } else {
                 "low"
             };
 
             match (node_type, volume_level) {
+                (NodeType::Sink, "overamplified") => "output_volume_overamplified",
                 (NodeType::Sink, "high") => "output_volume_high",
                 (NodeType::Sink, "medium") => "output_volume_medium",
                 (NodeType::Sink, "low") => "output_volume_low",
+                (NodeType::Source, "overamplified") => "input_volume_overamplified",
                 (NodeType::Source, "high") => "input_volume_high",
                 (NodeType::Source, "medium") => "input_volume_medium",
                 (NodeType::Source, "low") => "input_volume_low",
@@ -112,12 +116,26 @@ impl NotificationManager {
         let icon_name = self.icons.get_xdg_icon(icon_key);
 
         let summary = if is_muted {
-            rust_i18n::t!("notifications.pw.device_muted", device_name = device_name)
+            t!("notifications.pw.device_muted", device_name = device_name)
+        } else if volume_percent > 100 {
+            t!(
+                "notifications.pw.volume_overamplified_set",
+                volume = volume_percent
+            )
         } else {
-            rust_i18n::t!("notifications.pw.volume_set", volume = volume_percent)
+            t!("notifications.pw.volume_set", volume = volume_percent)
         };
 
         let body = device_name.to_string();
+
+        let progress_value = if is_muted {
+            0
+        } else if volume_percent <= 100 {
+            volume_percent as i32
+        } else {
+            ((volume_percent - 100) as f32 / 100.0 * 100.0).round() as i32
+        }
+        .clamp(0, 100);
 
         let volume_id = {
             let mut volume_id_lock = self
@@ -135,10 +153,7 @@ impl NotificationManager {
                     .timeout(Timeout::Milliseconds(3000))
                     .hint(Hint::Transient(true))
                     .hint(Hint::Category("progress".to_string()))
-                    .hint(Hint::CustomInt(
-                        "value".to_string(),
-                        volume_percent.clamp(0, 100) as i32,
-                    ))
+                    .hint(Hint::CustomInt("value".to_string(), progress_value))
                     .show()?;
 
                 let new_id = initial_notification.id();
@@ -162,10 +177,7 @@ impl NotificationManager {
             .timeout(Timeout::Milliseconds(3000))
             .hint(Hint::Transient(true))
             .hint(Hint::Category("progress".to_string()))
-            .hint(Hint::CustomInt(
-                "value".to_string(),
-                volume_percent.clamp(0, 100) as i32,
-            ))
+            .hint(Hint::CustomInt("value".to_string(), progress_value))
             .show()?;
 
         let mut handles = self
