@@ -290,6 +290,18 @@ impl App {
         Ok(None)
     }
 
+    fn find_replacement_node(&self, original_node: &Node, is_output: bool) -> Option<Node> {
+        let device_id = original_node.device_id?;
+
+        let nodes = if is_output {
+            self.controller.get_output_nodes()
+        } else {
+            self.controller.get_input_nodes()
+        };
+
+        nodes.into_iter().find(|n| n.device_id == Some(device_id))
+    }
+
     async fn handle_device_menu(
         &mut self,
         menu: &Menu,
@@ -304,7 +316,29 @@ impl App {
 
         while stay_in_device_menu {
             if let Some(updated_node) = self.controller.get_node(current_node.id) {
-                current_node = updated_node;
+                if updated_node.node_type == current_node.node_type {
+                    current_node = updated_node;
+                } else if let Some(replacement) =
+                    self.find_replacement_node(&current_node, is_output)
+                {
+                    try_send_log!(
+                        self.log_sender,
+                        format!(
+                            "Device node changed after profile switch, using new node: {}",
+                            replacement
+                                .description
+                                .as_ref()
+                                .unwrap_or(&replacement.name)
+                        )
+                    );
+                    current_node = replacement;
+                } else {
+                    return Ok(());
+                }
+            } else if let Some(replacement) = self.find_replacement_node(&current_node, is_output) {
+                current_node = replacement;
+            } else {
+                return Ok(());
             }
 
             let should_stay = self
