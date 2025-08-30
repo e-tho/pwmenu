@@ -168,17 +168,6 @@ impl App {
             Some(selection) => {
                 let refresh_text = OutputMenuOptions::RefreshList.to_str();
                 if selection == refresh_text.as_ref() {
-                    try_send_log!(
-                        self.log_sender,
-                        t!("notifications.pw.outputs_refreshed").to_string()
-                    );
-                    try_send_notification!(
-                        self.notification_manager,
-                        Some(t!("notifications.pw.outputs_refreshed").to_string()),
-                        None,
-                        Some("refresh"),
-                        None
-                    );
                     Ok(true)
                 } else {
                     let selected_node =
@@ -238,17 +227,6 @@ impl App {
             Some(selection) => {
                 let refresh_text = InputMenuOptions::RefreshList.to_str();
                 if selection == refresh_text.as_ref() {
-                    try_send_log!(
-                        self.log_sender,
-                        t!("notifications.pw.inputs_refreshed").to_string()
-                    );
-                    try_send_notification!(
-                        self.notification_manager,
-                        Some(t!("notifications.pw.inputs_refreshed").to_string()),
-                        None,
-                        Some("refresh"),
-                        None
-                    );
                     Ok(true)
                 } else {
                     let selected_node =
