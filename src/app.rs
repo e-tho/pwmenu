@@ -677,10 +677,7 @@ impl App {
         self.controller.set_volume(node.id, new_volume).await?;
 
         let volume_percent = (new_volume * 100.0).round() as u8;
-        let display_name = current_node
-            .description
-            .as_ref()
-            .unwrap_or(&current_node.name);
+        let display_name = self.controller.get_node_base_name(node);
 
         let msg = t!(
             "notifications.pw.volume_changed",
@@ -690,7 +687,7 @@ impl App {
 
         try_send_log!(self.log_sender, msg.to_string());
         self.notification_manager.send_volume_notification(
-            display_name,
+            &display_name,
             volume_percent,
             current_node.volume.muted,
             &current_node.node_type,
