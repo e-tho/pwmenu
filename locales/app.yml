@@ -14,7 +14,7 @@ menus:
           de: "Eingabegeräte"
   output:
     hint:
-      en: "Choose Output Device"
+      en: "Select Output Device"
       fr: "Sélectionner un périphérique de sortie"
       de: "Ausgabegerät auswählen"
     options:
@@ -25,12 +25,12 @@ menus:
           de: "Aktualisieren"
       device:
         name:
-          en: "Choose Output Device"
+          en: "Select Output Device"
           fr: "Sélectionner un périphérique de sortie"
           de: "Ausgabegerät auswählen"
   input:
     hint:
-      en: "Choose Input Device"
+      en: "Select Input Device"
       fr: "Sélectionner un périphérique d'entrée"
       de: "Eingabegerät auswählen"
     options:
@@ -41,7 +41,7 @@ menus:
           de: "Aktualisieren"
       device:
         name:
-          en: "Choose Input Device"
+          en: "Select Input Device"
           fr: "Sélectionner un périphérique d'entrée"
           de: "Eingabegerät auswählen"
   device:
