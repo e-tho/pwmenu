@@ -254,8 +254,15 @@ impl App {
                     let selected_node =
                         self.handle_device_selection(&nodes, &selection, menu, icon_type, spaces)?;
                     if let Some(node) = selected_node {
-                        self.handle_device_menu(menu, menu_command, &node, icon_type, spaces, true)
-                            .await?;
+                        self.handle_device_menu(
+                            menu,
+                            menu_command,
+                            &node,
+                            icon_type,
+                            spaces,
+                            false,
+                        )
+                        .await?;
                     }
                     Ok(true)
                 }
