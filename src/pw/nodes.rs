@@ -51,6 +51,7 @@ impl Volume {
 pub struct Node {
     pub id: u32,
     pub name: String,
+    pub nick: Option<String>,
     pub description: Option<String>,
     pub media_class: Option<String>,
     pub application_name: Option<String>,
@@ -64,6 +65,7 @@ pub struct Node {
 pub struct NodeInternal {
     pub id: u32,
     pub name: String,
+    pub nick: Option<String>,
     pub description: Option<String>,
     pub media_class: Option<String>,
     pub application_name: Option<String>,
@@ -84,6 +86,7 @@ impl NodeInternal {
         Node {
             id: self.id,
             name: self.name.clone(),
+            nick: self.nick.clone(),
             description: self.description.clone(),
             media_class: self.media_class.clone(),
             application_name: self.application_name.clone(),
@@ -116,6 +119,7 @@ impl Store {
             .or_else(|| props.get(*pipewire::keys::NODE_NICK))
             .unwrap_or("Unknown Node")
             .to_string();
+        let nick = props.get(*pipewire::keys::NODE_NICK).map(str::to_string); // Add this line
         let description = props
             .get(*pipewire::keys::NODE_DESCRIPTION)
             .map(str::to_string);
@@ -144,6 +148,7 @@ impl Store {
         let mut node = NodeInternal {
             id: global.id,
             name: name.clone(),
+            nick,
             description,
             media_class,
             application_name,
@@ -258,13 +263,15 @@ impl Store {
             for prop in &obj.properties {
                 match prop.key {
                     libspa::sys::SPA_PROP_channelVolumes => {
-                        if let Some(raw_volume) =
-                            VolumeResolver::extract_channel_volume(&prop.value)
-                        {
-                            let scaled_volume = VolumeResolver::apply_cubic_scaling(raw_volume);
-                            if (node.volume - scaled_volume).abs() > 0.001 {
-                                node.volume = scaled_volume;
-                                updated = true;
+                        if matches!(node.node_type, NodeType::Sink | NodeType::Source) {
+                            if let Some(raw_volume) =
+                                VolumeResolver::extract_channel_volume(&prop.value)
+                            {
+                                let scaled_volume = VolumeResolver::apply_cubic_scaling(raw_volume);
+                                if (node.volume - scaled_volume).abs() > 0.001 {
+                                    node.volume = scaled_volume;
+                                    updated = true;
+                                }
                             }
                         }
                     }

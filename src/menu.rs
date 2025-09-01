@@ -12,6 +12,8 @@ use std::sync::Arc;
 pub enum MainMenuOptions {
     ShowOutputMenu,
     ShowInputMenu,
+    ShowOutputStreamsMenu,
+    ShowInputStreamsMenu,
 }
 
 impl MainMenuOptions {
@@ -21,6 +23,12 @@ impl MainMenuOptions {
                 Some(MainMenuOptions::ShowOutputMenu)
             }
             s if s == t!("menus.main.options.inputs.name") => Some(MainMenuOptions::ShowInputMenu),
+            s if s == t!("menus.main.options.output_streams.name") => {
+                Some(MainMenuOptions::ShowOutputStreamsMenu)
+            }
+            s if s == t!("menus.main.options.input_streams.name") => {
+                Some(MainMenuOptions::ShowInputStreamsMenu)
+            }
             _ => None,
         }
     }
@@ -29,6 +37,32 @@ impl MainMenuOptions {
         match self {
             MainMenuOptions::ShowOutputMenu => t!("menus.main.options.outputs.name"),
             MainMenuOptions::ShowInputMenu => t!("menus.main.options.inputs.name"),
+            MainMenuOptions::ShowOutputStreamsMenu => t!("menus.main.options.output_streams.name"),
+            MainMenuOptions::ShowInputStreamsMenu => t!("menus.main.options.input_streams.name"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum StreamMenuOptions {
+    RefreshList,
+    Stream(String),
+}
+
+impl StreamMenuOptions {
+    pub fn from_string(option: &str) -> Option<Self> {
+        match option {
+            s if s == t!("menus.streams.options.refresh.name") => {
+                Some(StreamMenuOptions::RefreshList)
+            }
+            other => Some(StreamMenuOptions::Stream(other.to_string())),
+        }
+    }
+
+    pub fn to_str(&self) -> Cow<'static, str> {
+        match self {
+            StreamMenuOptions::RefreshList => t!("menus.streams.options.refresh.name"),
+            StreamMenuOptions::Stream(_) => t!("menus.streams.options.stream.name"),
         }
     }
 }
@@ -287,6 +321,14 @@ impl Menu {
         let options = vec![
             ("output", MainMenuOptions::ShowOutputMenu.to_str()),
             ("input", MainMenuOptions::ShowInputMenu.to_str()),
+            (
+                "output_streams",
+                MainMenuOptions::ShowOutputStreamsMenu.to_str(),
+            ),
+            (
+                "input_streams",
+                MainMenuOptions::ShowInputStreamsMenu.to_str(),
+            ),
         ];
 
         let input = self.get_icon_text(options, icon_type, spaces);
@@ -296,6 +338,56 @@ impl Menu {
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
             return Ok(MainMenuOptions::from_string(&cleaned_output));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn show_stream_menu(
+        &self,
+        launcher_command: &Option<String>,
+        streams: &[Node],
+        controller: &Controller,
+        icon_type: &str,
+        spaces: usize,
+        is_output: bool,
+    ) -> Result<Option<String>> {
+        let refresh_text = StreamMenuOptions::RefreshList.to_str();
+        let options_start = vec![("refresh", refresh_text.as_ref())];
+
+        let mut input = self.get_icon_text(options_start, icon_type, spaces);
+
+        for stream in streams {
+            let display_name = controller.get_application_display_name(stream);
+
+            let volume_str = if stream.volume.muted {
+                format!(" [{}]", t!("menus.volume.muted"))
+            } else {
+                format!(" [{}%]", stream.volume.percent())
+            };
+
+            let full_display = format!("{display_name}{volume_str}");
+            let formatted = self.format_display_with_icon(
+                &full_display,
+                &self.icons.get_icon("stream", icon_type),
+                icon_type,
+                spaces,
+            );
+            input.push_str(&format!("\n{formatted}"));
+        }
+
+        let hint = if is_output {
+            t!("menus.output_streams.hint")
+        } else {
+            t!("menus.input_streams.hint")
+        };
+
+        let menu_output =
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
+
+        if let Some(output) = menu_output {
+            let cleaned_output = self.clean_menu_output(&output, icon_type);
+            return Ok(Some(cleaned_output));
         }
 
         Ok(None)

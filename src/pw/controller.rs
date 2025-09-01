@@ -360,6 +360,78 @@ impl Controller {
         result
     }
 
+    pub fn get_output_streams(&self) -> Vec<Node> {
+        let graph = self.engine.graph();
+
+        graph
+            .nodes
+            .values()
+            .filter(|n| {
+                let is_output_stream = n
+                    .media_class
+                    .as_ref()
+                    .map(|mc| mc.starts_with("Stream/Output"))
+                    .unwrap_or(false);
+
+                let has_app_name = n.application_name.is_some();
+                let not_monitor = !n.name.to_lowercase().contains("monitor");
+
+                is_output_stream && has_app_name && not_monitor
+            })
+            .map(|n| self.enhance_node_volume(n, &graph))
+            .collect()
+    }
+
+    pub fn get_input_streams(&self) -> Vec<Node> {
+        let graph = self.engine.graph();
+
+        graph
+            .nodes
+            .values()
+            .filter(|n| {
+                let is_input_stream = n
+                    .media_class
+                    .as_ref()
+                    .map(|mc| mc.starts_with("Stream/Input"))
+                    .unwrap_or(false);
+
+                let has_app_name = n.application_name.is_some();
+                let not_monitor = !n.name.to_lowercase().contains("monitor");
+
+                is_input_stream && has_app_name && not_monitor
+            })
+            .map(|n| self.enhance_node_volume(n, &graph))
+            .collect()
+    }
+
+    fn extract_display_name_from_identifier(identifier: &str) -> String {
+        if identifier.contains('.') {
+            identifier
+                .split('.')
+                .next_back()
+                .unwrap_or(identifier)
+                .to_string()
+        } else {
+            identifier.to_string()
+        }
+    }
+
+    pub fn get_application_display_name(&self, node: &Node) -> String {
+        if let Some(nick) = &node.nick {
+            return nick.clone();
+        }
+
+        if let Some(desc) = &node.description {
+            return Self::extract_display_name_from_identifier(desc);
+        }
+
+        if let Some(app_name) = &node.application_name {
+            return Self::extract_display_name_from_identifier(app_name);
+        }
+
+        node.name.clone()
+    }
+
     pub async fn create_link(&self, output_node: u32, input_node: u32) -> Result<()> {
         let result = self.engine.create_link(output_node, input_node).await;
 

@@ -57,6 +57,24 @@ impl Icons {
             IconDefinition::simple("audio-input-microphone-symbolic"),
         );
 
+        font_icons.insert("output_streams", '\u{f040c}');
+        xdg_icons.insert(
+            "output_streams",
+            IconDefinition::simple("media-playback-start-symbolic"),
+        );
+
+        font_icons.insert("input_streams", '\u{f044b}');
+        xdg_icons.insert(
+            "input_streams",
+            IconDefinition::simple("media-record-symbolic"),
+        );
+
+        font_icons.insert("stream", '\u{f0384}');
+        xdg_icons.insert(
+            "stream",
+            IconDefinition::simple("applications-multimedia-symbolic"),
+        );
+
         font_icons.insert("virtual", '\u{f0471}');
         xdg_icons.insert(
             "virtual",

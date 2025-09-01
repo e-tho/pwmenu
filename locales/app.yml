@@ -12,6 +12,38 @@ menus:
           en: "Input Devices"
           fr: "Périphériques d'entrée"
           de: "Eingabegeräte"
+      output_streams:
+        name:
+          en: "Output Streams"
+          fr: "Flux de sortie"
+          de: "Ausgabestreams"
+      input_streams:
+        name:
+          en: "Input Streams"
+          fr: "Flux d'entrée"
+          de: "Eingabestreams"
+  output_streams:
+    hint:
+      en: "Select Output Stream"
+      fr: "Sélectionner un flux de sortie"
+      de: "Ausgabestream auswählen"
+  input_streams:
+    hint:
+      en: "Select Input Stream"
+      fr: "Sélectionner un flux d'entrée"
+      de: "Eingabestream auswählen"
+  streams:
+    options:
+      refresh:
+        name:
+          en: "Refresh"
+          fr: "Actualiser"
+          de: "Aktualisieren"
+      stream:
+        name:
+          en: "Select Stream"
+          fr: "Sélectionner un flux"
+          de: "Stream auswählen"
   output:
     hint:
       en: "Select Output Device"
@@ -122,6 +154,14 @@ notifications:
       en: "Exited main menu"
       fr: "Menu principal quitté"
       de: "Hauptmenü wurde verlassen"
+    output_streams_menu_exited:
+      en: "Exited output streams menu"
+      fr: "Menu des flux de sortie quitté"
+      de: "Ausgabestreams-Menü wurde verlassen"
+    input_streams_menu_exited:
+      en: "Exited input streams menu"
+      fr: "Menu des flux d'entrée quitté"
+      de: "Eingabestreams-Menü wurde verlassen"
     output_menu_exited:
       en: "Exited output devices menu"
       fr: "Menu des périphériques de sortie quitté"

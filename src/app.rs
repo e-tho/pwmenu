@@ -2,12 +2,11 @@ use crate::{
     icons::Icons,
     menu::{
         DeviceMenuOptions, InputMenuOptions, MainMenuOptions, Menu, OutputMenuOptions,
-        ProfileMenuOptions, VolumeMenuOptions,
+        ProfileMenuOptions, StreamMenuOptions, VolumeMenuOptions,
     },
     notification::NotificationManager,
     pw::{controller::Controller, nodes::Node, Profile},
 };
-use anyhow::anyhow;
 use anyhow::Result;
 use rust_i18n::t;
 use std::sync::Arc;
@@ -126,8 +125,136 @@ impl App {
                 self.handle_input_menu(menu, menu_command, icon_type, spaces)
                     .await?;
             }
+            MainMenuOptions::ShowOutputStreamsMenu => {
+                self.handle_output_streams_menu(menu, menu_command, icon_type, spaces)
+                    .await?;
+            }
+            MainMenuOptions::ShowInputStreamsMenu => {
+                self.handle_input_streams_menu(menu, menu_command, icon_type, spaces)
+                    .await?;
+            }
         }
         Ok(None)
+    }
+
+    async fn handle_output_streams_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<()> {
+        let mut stay_in_streams_menu = true;
+
+        while stay_in_streams_menu {
+            let should_stay = self
+                .handle_stream_options(menu, menu_command, icon_type, spaces, true)
+                .await?;
+
+            if !should_stay {
+                stay_in_streams_menu = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_input_streams_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<()> {
+        let mut stay_in_streams_menu = true;
+
+        while stay_in_streams_menu {
+            let should_stay = self
+                .handle_stream_options(menu, menu_command, icon_type, spaces, false)
+                .await?;
+
+            if !should_stay {
+                stay_in_streams_menu = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_stream_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+        is_output: bool,
+    ) -> Result<bool> {
+        let streams = if is_output {
+            self.controller.get_output_streams()
+        } else {
+            self.controller.get_input_streams()
+        };
+
+        let menu_result = menu
+            .show_stream_menu(
+                menu_command,
+                &streams,
+                &self.controller,
+                icon_type,
+                spaces,
+                is_output,
+            )
+            .await?;
+
+        match menu_result {
+            Some(selection) => {
+                let refresh_text = StreamMenuOptions::RefreshList.to_str();
+                if selection == refresh_text.as_ref() {
+                    Ok(true)
+                } else {
+                    if let Some(stream) = self.find_stream_by_name(&streams, &selection) {
+                        self.handle_volume_menu(
+                            menu,
+                            menu_command,
+                            &stream,
+                            icon_type,
+                            spaces,
+                            is_output,
+                        )
+                        .await?;
+                    }
+                    Ok(true)
+                }
+            }
+            None => {
+                let menu_type = if is_output {
+                    "output_streams"
+                } else {
+                    "input_streams"
+                };
+                try_send_log!(
+                    self.log_sender,
+                    t!("notifications.pw.{}_menu_exited", menu_type = menu_type).to_string()
+                );
+                Ok(false)
+            }
+        }
+    }
+
+    fn find_stream_by_name(&self, streams: &[Node], selection: &str) -> Option<Node> {
+        let base_selection = if let Some(pos) = selection.find(" [") {
+            &selection[..pos]
+        } else {
+            selection
+        };
+
+        for stream in streams {
+            let display_name = self.controller.get_application_display_name(stream);
+            if display_name == base_selection {
+                return Some(stream.clone());
+            }
+        }
+        None
     }
 
     async fn handle_output_menu(
@@ -540,7 +667,11 @@ impl App {
         is_output: bool,
         last_action: Option<VolumeMenuOptions>,
     ) -> Result<(bool, Option<VolumeMenuOptions>)> {
-        let device_name = self.controller.get_device_name(node.device_id.unwrap_or(0));
+        let device_name = if node.device_id.is_some() {
+            self.controller.get_device_name(node.device_id.unwrap_or(0))
+        } else {
+            self.controller.get_application_display_name(node)
+        };
 
         let volume_display = if node.volume.muted {
             t!("menus.volume.muted").to_string()
@@ -650,14 +781,7 @@ impl App {
     }
 
     async fn perform_volume_change(&self, node: &Node, delta: f32) -> Result<()> {
-        let node_id = node.id;
-        let current_node = self
-            .controller
-            .get_node(node.id)
-            .ok_or_else(|| anyhow!("Node {node_id} not found"))?;
-
-        let current = current_node.volume.linear;
-        let new_volume = (current + delta).clamp(0.0, 2.0);
+        let new_volume = (node.volume.linear + delta).clamp(0.0, 2.0);
 
         self.controller.set_volume(node.id, new_volume).await?;
 
@@ -674,8 +798,8 @@ impl App {
         self.notification_manager.send_volume_notification(
             &display_name,
             volume_percent,
-            current_node.volume.muted,
-            &current_node.node_type,
+            node.volume.muted,
+            &node.node_type,
         )?;
 
         Ok(())
