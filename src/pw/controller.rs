@@ -70,10 +70,7 @@ impl Controller {
         let nodes: Vec<Node> = graph
             .nodes
             .values()
-            .filter(|n| {
-                matches!(n.node_type, NodeType::Sink | NodeType::Duplex)
-                    && !n.name.to_lowercase().contains("monitor")
-            })
+            .filter(|n| matches!(n.node_type, NodeType::AudioSink))
             .map(|n| self.enhance_node_volume(n, &graph))
             .collect();
 
@@ -86,14 +83,33 @@ impl Controller {
         let nodes: Vec<Node> = graph
             .nodes
             .values()
-            .filter(|n| {
-                matches!(n.node_type, NodeType::Source | NodeType::Duplex)
-                    && !n.name.to_lowercase().contains("monitor")
-            })
+            .filter(|n| matches!(n.node_type, NodeType::AudioSource))
             .map(|n| self.enhance_node_volume(n, &graph))
             .collect();
 
         self.sort_nodes_by_priority(nodes)
+    }
+
+    pub fn get_output_streams(&self) -> Vec<Node> {
+        let graph = self.engine.graph();
+
+        graph
+            .nodes
+            .values()
+            .filter(|n| matches!(n.node_type, NodeType::StreamOutputAudio))
+            .map(|n| self.enhance_node_volume(n, &graph))
+            .collect()
+    }
+
+    pub fn get_input_streams(&self) -> Vec<Node> {
+        let graph = self.engine.graph();
+
+        graph
+            .nodes
+            .values()
+            .filter(|n| matches!(n.node_type, NodeType::StreamInputAudio))
+            .map(|n| self.enhance_node_volume(n, &graph))
+            .collect()
     }
 
     pub fn get_node(&self, node_id: u32) -> Option<Node> {
@@ -107,8 +123,8 @@ impl Controller {
             if let Some(device) = graph.devices.get(&device_id) {
                 if device.has_route_volume {
                     let route_direction = match node.node_type {
-                        NodeType::Sink => Some(RouteDirection::Output),
-                        NodeType::Source => Some(RouteDirection::Input),
+                        NodeType::AudioSink => Some(RouteDirection::Output),
+                        NodeType::AudioSource => Some(RouteDirection::Input),
                         _ => None,
                     };
 
@@ -237,36 +253,36 @@ impl Controller {
             .get(&node_id)
             .ok_or_else(|| anyhow!("Node {node_id} not found"))?;
 
-        // Try device-level control first, fall back to node-level
-        let result = if let Some(device_id) = node.device_id {
-            if let Some(device) = graph.devices.get(&device_id) {
-                if device.has_route_volume {
-                    let target_direction = match node.node_type {
-                        NodeType::Sink => {
-                            if device.output_route.is_available() {
-                                Some(RouteDirection::Output)
-                            } else {
-                                None
-                            }
-                        }
-                        NodeType::Source => {
-                            if device.input_route.is_available() {
-                                Some(RouteDirection::Input)
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None,
-                    };
+        let result = match node.node_type {
+            NodeType::StreamOutputAudio | NodeType::StreamInputAudio => {
+                self.engine.set_node_volume(node_id, volume).await
+            }
+            NodeType::AudioSink | NodeType::AudioSource => {
+                if let Some(device_id) = node.device_id {
+                    if let Some(device) = graph.devices.get(&device_id) {
+                        if device.has_route_volume {
+                            let target_direction = match node.node_type {
+                                NodeType::AudioSink | NodeType::AudioDuplex => {
+                                    Some(RouteDirection::Output)
+                                }
+                                NodeType::AudioSource => Some(RouteDirection::Input),
+                                _ => None,
+                            };
 
-                    if let Some(direction) = target_direction {
-                        match self
-                            .engine
-                            .set_device_volume(device_id, volume, Some(direction))
-                            .await
-                        {
-                            Ok(()) => Ok(()),
-                            Err(_) => self.engine.set_node_volume(node_id, volume).await,
+                            if let Some(direction) = target_direction {
+                                match self
+                                    .engine
+                                    .set_device_volume(device_id, volume, Some(direction))
+                                    .await
+                                {
+                                    Ok(()) => Ok(()),
+                                    Err(_) => self.engine.set_node_volume(node_id, volume).await,
+                                }
+                            } else {
+                                self.engine.set_node_volume(node_id, volume).await
+                            }
+                        } else {
+                            self.engine.set_node_volume(node_id, volume).await
                         }
                     } else {
                         self.engine.set_node_volume(node_id, volume).await
@@ -274,11 +290,8 @@ impl Controller {
                 } else {
                     self.engine.set_node_volume(node_id, volume).await
                 }
-            } else {
-                self.engine.set_node_volume(node_id, volume).await
             }
-        } else {
-            self.engine.set_node_volume(node_id, volume).await
+            _ => self.engine.set_node_volume(node_id, volume).await,
         };
 
         if result.is_ok() {
@@ -307,14 +320,14 @@ impl Controller {
             if let Some(device) = graph.devices.get(&device_id) {
                 if device.has_route_volume {
                     let target_direction = match node.node_type {
-                        NodeType::Sink => {
+                        NodeType::AudioSink => {
                             if device.output_route.is_available() {
                                 Some(RouteDirection::Output)
                             } else {
                                 None
                             }
                         }
-                        NodeType::Source => {
+                        NodeType::AudioSource => {
                             if device.input_route.is_available() {
                                 Some(RouteDirection::Input)
                             } else {
@@ -358,50 +371,6 @@ impl Controller {
         }
 
         result
-    }
-
-    pub fn get_output_streams(&self) -> Vec<Node> {
-        let graph = self.engine.graph();
-
-        graph
-            .nodes
-            .values()
-            .filter(|n| {
-                let is_output_stream = n
-                    .media_class
-                    .as_ref()
-                    .map(|mc| mc.starts_with("Stream/Output"))
-                    .unwrap_or(false);
-
-                let has_app_name = n.application_name.is_some();
-                let not_monitor = !n.name.to_lowercase().contains("monitor");
-
-                is_output_stream && has_app_name && not_monitor
-            })
-            .map(|n| self.enhance_node_volume(n, &graph))
-            .collect()
-    }
-
-    pub fn get_input_streams(&self) -> Vec<Node> {
-        let graph = self.engine.graph();
-
-        graph
-            .nodes
-            .values()
-            .filter(|n| {
-                let is_input_stream = n
-                    .media_class
-                    .as_ref()
-                    .map(|mc| mc.starts_with("Stream/Input"))
-                    .unwrap_or(false);
-
-                let has_app_name = n.application_name.is_some();
-                let not_monitor = !n.name.to_lowercase().contains("monitor");
-
-                is_input_stream && has_app_name && not_monitor
-            })
-            .map(|n| self.enhance_node_volume(n, &graph))
-            .collect()
     }
 
     fn extract_display_name_from_identifier(identifier: &str) -> String {
@@ -595,10 +564,10 @@ impl Controller {
     }
 
     pub fn get_node_port_number(&self, node: &Node) -> Option<usize> {
-        let nodes_of_same_type = if matches!(node.node_type, NodeType::Sink | NodeType::Duplex) {
-            self.get_output_nodes()
-        } else {
-            self.get_input_nodes()
+        let nodes_of_same_type = match node.node_type {
+            NodeType::AudioSink => self.get_output_nodes(),
+            NodeType::AudioSource => self.get_input_nodes(),
+            _ => return None,
         }
         .into_iter()
         .filter(|n| n.device_id == node.device_id)

@@ -436,7 +436,7 @@ impl Icons {
         }
 
         let icon_key = match device_info.node_type {
-            NodeType::Source => "input",
+            NodeType::AudioSource => "input",
             _ => "output",
         };
         self.get_icon(icon_key, icon_type)

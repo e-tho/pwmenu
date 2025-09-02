@@ -974,9 +974,15 @@ impl Store {
 
         if let Some(device) = self.devices.get_mut(&device_id) {
             if device.device_type == DeviceType::Unknown {
-                if node_types.iter().any(|&nt| matches!(nt, NodeType::Sink)) {
+                if node_types
+                    .iter()
+                    .any(|&nt| matches!(nt, NodeType::AudioSink))
+                {
                     device.device_type = DeviceType::Sink;
-                } else if node_types.iter().any(|&nt| matches!(nt, NodeType::Source)) {
+                } else if node_types
+                    .iter()
+                    .any(|&nt| matches!(nt, NodeType::AudioSource))
+                {
                     device.device_type = DeviceType::Source;
                 }
             }

@@ -76,8 +76,8 @@ impl NotificationManager {
     ) -> &str {
         if is_muted {
             match node_type {
-                NodeType::Sink => "output_mute",
-                NodeType::Source => "input_mute",
+                NodeType::AudioSink => "output_mute",
+                NodeType::AudioSource => "input_mute",
                 _ => "output_mute",
             }
         } else {
@@ -92,14 +92,14 @@ impl NotificationManager {
             };
 
             match (node_type, volume_level) {
-                (NodeType::Sink, "overamplified") => "output_volume_overamplified",
-                (NodeType::Sink, "high") => "output_volume_high",
-                (NodeType::Sink, "medium") => "output_volume_medium",
-                (NodeType::Sink, "low") => "output_volume_low",
-                (NodeType::Source, "overamplified") => "input_volume_overamplified",
-                (NodeType::Source, "high") => "input_volume_high",
-                (NodeType::Source, "medium") => "input_volume_medium",
-                (NodeType::Source, "low") => "input_volume_low",
+                (NodeType::AudioSink, "overamplified") => "output_volume_overamplified",
+                (NodeType::AudioSink, "high") => "output_volume_high",
+                (NodeType::AudioSink, "medium") => "output_volume_medium",
+                (NodeType::AudioSink, "low") => "output_volume_low",
+                (NodeType::AudioSource, "overamplified") => "input_volume_overamplified",
+                (NodeType::AudioSource, "high") => "input_volume_high",
+                (NodeType::AudioSource, "medium") => "input_volume_medium",
+                (NodeType::AudioSource, "low") => "input_volume_low",
                 _ => "output_volume_medium",
             }
         }

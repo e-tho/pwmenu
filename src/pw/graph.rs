@@ -163,7 +163,7 @@ impl Store {
             let mut found_default = false;
 
             for (node_id, node) in &mut self.nodes {
-                if !matches!(node.node_type, crate::pw::nodes::NodeType::Sink) {
+                if !matches!(node.node_type, crate::pw::nodes::NodeType::AudioSink) {
                     continue;
                 }
 
@@ -192,7 +192,7 @@ impl Store {
                 let sink_node_ids: Vec<u32> = self
                     .nodes
                     .iter()
-                    .filter(|(_, n)| matches!(n.node_type, crate::pw::nodes::NodeType::Sink))
+                    .filter(|(_, n)| matches!(n.node_type, crate::pw::nodes::NodeType::AudioSink))
                     .map(|(id, _)| *id)
                     .collect();
 
@@ -208,7 +208,7 @@ impl Store {
         // Similar logic for source (simplified for brevity)
         if let Some(default_source_name) = metadata_manager.get_default_source() {
             for (node_id, node) in &mut self.nodes {
-                if matches!(node.node_type, crate::pw::nodes::NodeType::Source) {
+                if matches!(node.node_type, crate::pw::nodes::NodeType::AudioSource) {
                     let name_matches = node.name == default_source_name
                         || node.name.trim() == default_source_name.trim()
                         || node.description.as_ref() == Some(&default_source_name);
@@ -255,7 +255,7 @@ impl Store {
         let has_audio_nodes = self
             .nodes
             .values()
-            .any(|n| matches!(n.node_type, NodeType::Sink | NodeType::Source));
+            .any(|n| matches!(n.node_type, NodeType::AudioSink | NodeType::AudioSource));
 
         if !has_audio_nodes {
             return false;
@@ -264,7 +264,7 @@ impl Store {
         let all_audio_nodes_have_params = self
             .nodes
             .values()
-            .filter(|n| matches!(n.node_type, NodeType::Sink | NodeType::Source))
+            .filter(|n| matches!(n.node_type, NodeType::AudioSink | NodeType::AudioSource))
             .all(|n| n.has_received_params);
 
         if !all_audio_nodes_have_params {
@@ -306,17 +306,17 @@ impl Store {
         let has_sinks = self
             .nodes
             .values()
-            .any(|n| matches!(n.node_type, NodeType::Sink));
+            .any(|n| matches!(n.node_type, NodeType::AudioSink));
         let has_sources = self
             .nodes
             .values()
-            .any(|n| matches!(n.node_type, NodeType::Source));
+            .any(|n| matches!(n.node_type, NodeType::AudioSource));
 
         if has_sinks && self.default_sink.is_none() {
             let sink_ids: Vec<u32> = self
                 .nodes
                 .iter()
-                .filter(|(_, n)| matches!(n.node_type, NodeType::Sink))
+                .filter(|(_, n)| matches!(n.node_type, NodeType::AudioSink))
                 .map(|(id, _)| *id)
                 .collect();
 
@@ -332,7 +332,7 @@ impl Store {
             let source_ids: Vec<u32> = self
                 .nodes
                 .iter()
-                .filter(|(_, n)| matches!(n.node_type, NodeType::Source))
+                .filter(|(_, n)| matches!(n.node_type, NodeType::AudioSource))
                 .map(|(id, _)| *id)
                 .collect();
 

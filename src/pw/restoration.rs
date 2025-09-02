@@ -69,12 +69,14 @@ impl RestorationManager {
 
         // Check current defaults for this device
         let had_default_sink = store.nodes.values().any(|n| {
-            n.device_id == Some(device_id) && n.is_default && matches!(n.node_type, NodeType::Sink)
+            n.device_id == Some(device_id)
+                && n.is_default
+                && matches!(n.node_type, NodeType::AudioSink)
         });
         let had_default_source = store.nodes.values().any(|n| {
             n.device_id == Some(device_id)
                 && n.is_default
-                && matches!(n.node_type, NodeType::Source)
+                && matches!(n.node_type, NodeType::AudioSource)
         });
 
         if !had_default_sink && !had_default_source {
@@ -184,11 +186,9 @@ impl RestorationManager {
 
         // Collect sink nodes to restore as default
         if restoration.had_default_sink {
-            if let Some(sink_node) = store
-                .nodes
-                .values()
-                .find(|n| n.device_id == Some(device.id) && matches!(n.node_type, NodeType::Sink))
-            {
+            if let Some(sink_node) = store.nodes.values().find(|n| {
+                n.device_id == Some(device.id) && matches!(n.node_type, NodeType::AudioSink)
+            }) {
                 sink_ids.push(sink_node.id);
                 debug!("Found sink node to restore: {}", sink_node.name);
             } else {
@@ -197,11 +197,9 @@ impl RestorationManager {
         }
 
         if restoration.had_default_source {
-            if let Some(source_node) = store
-                .nodes
-                .values()
-                .find(|n| n.device_id == Some(device.id) && matches!(n.node_type, NodeType::Source))
-            {
+            if let Some(source_node) = store.nodes.values().find(|n| {
+                n.device_id == Some(device.id) && matches!(n.node_type, NodeType::AudioSource)
+            }) {
                 source_ids.push(source_node.id);
                 debug!("Found source node to restore: {}", source_node.name);
             } else {

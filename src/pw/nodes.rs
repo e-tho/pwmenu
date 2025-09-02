@@ -20,11 +20,12 @@ use crate::pw::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeType {
-    Sink,    // Output node
-    Source,  // Input node
-    Duplex,  // Bidirectional node
-    Virtual, // Virtual device
-    Monitor, // Monitor of another node
+    AudioSink,
+    AudioSource,
+    AudioDuplex,
+    StreamOutputAudio,
+    StreamInputAudio,
+    AudioVirtual,
     Unknown,
 }
 
@@ -130,11 +131,11 @@ impl Store {
             .and_then(|id| id.parse().ok());
 
         let node_type = match media_class.as_deref() {
-            Some("Audio/Sink") => NodeType::Sink,
-            Some("Audio/Source") => NodeType::Source,
-            Some("Audio/Duplex") => NodeType::Duplex,
-            Some(s) if s.contains("Monitor") => NodeType::Monitor,
-            Some(s) if s.contains("Virtual") => NodeType::Virtual,
+            Some("Audio/Sink") => NodeType::AudioSink,
+            Some("Audio/Source") => NodeType::AudioSource,
+            Some("Audio/Duplex") => NodeType::AudioDuplex,
+            Some("Stream/Output/Audio") => NodeType::StreamOutputAudio,
+            Some("Stream/Input/Audio") => NodeType::StreamInputAudio,
             _ => NodeType::Unknown,
         };
 
@@ -155,8 +156,8 @@ impl Store {
             node_type,
             volume: 1.0,
             muted: false,
-            is_default: (node_type == NodeType::Sink && self.default_sink == Some(global.id))
-                || (node_type == NodeType::Source && self.default_source == Some(global.id)),
+            is_default: (node_type == NodeType::AudioSink && self.default_sink == Some(global.id))
+                || (node_type == NodeType::AudioSource && self.default_source == Some(global.id)),
             device_id,
             ports,
             proxy,
@@ -263,7 +264,7 @@ impl Store {
             for prop in &obj.properties {
                 match prop.key {
                     libspa::sys::SPA_PROP_channelVolumes => {
-                        if matches!(node.node_type, NodeType::Sink | NodeType::Source) {
+                        if matches!(node.node_type, NodeType::AudioSink | NodeType::AudioSource) {
                             if let Some(raw_volume) =
                                 VolumeResolver::extract_channel_volume(&prop.value)
                             {
@@ -375,7 +376,7 @@ impl Store {
             .get(&node_id)
             .ok_or_else(|| anyhow!("Node {node_id} not found for set_default_sink"))?;
 
-        if node.node_type != NodeType::Sink {
+        if node.node_type != NodeType::AudioSink {
             return Err(anyhow!("Node {node_id} is not a Sink"));
         }
         if self.default_sink == Some(node_id) {
@@ -418,7 +419,7 @@ impl Store {
             .get(&node_id)
             .ok_or_else(|| anyhow!("Node {node_id} not found for set_default_source"))?;
 
-        if node.node_type != NodeType::Source {
+        if node.node_type != NodeType::AudioSource {
             return Err(anyhow!("Node {node_id} is not a Source"));
         }
         if self.default_source == Some(node_id) {
@@ -458,10 +459,7 @@ impl Store {
     pub fn get_output_nodes(&self) -> Vec<Node> {
         self.nodes
             .values()
-            .filter(|n| {
-                matches!(n.node_type, NodeType::Sink | NodeType::Duplex)
-                    && !n.name.to_lowercase().contains("monitor")
-            })
+            .filter(|n| matches!(n.node_type, NodeType::AudioSink))
             .map(|n| n.to_node())
             .collect()
     }
@@ -469,10 +467,7 @@ impl Store {
     pub fn get_input_nodes(&self) -> Vec<Node> {
         self.nodes
             .values()
-            .filter(|n| {
-                matches!(n.node_type, NodeType::Source | NodeType::Duplex)
-                    && !n.name.to_lowercase().contains("monitor")
-            })
+            .filter(|n| matches!(n.node_type, NodeType::AudioSource))
             .map(|n| n.to_node())
             .collect()
     }
