@@ -120,7 +120,7 @@ pwmenu -l custom --launcher-command "fuzzel -d --placeholder '{hint}'"
 | `--launcher-command` | Specify the command to use when `custom` launcher is set. | Any valid shell command                       | `None`        |
 | `-i`, `--icon`       | Specify the icon type to use.                             | `font`, `xdg`                                 | `font`        |
 | `-s`, `--spaces`     | Specify icon to text space count (font icons only).       | Any positive integer                          | `1`           |
-| `-m`, `--menu`       | Specify the root menu to start in.                        | `outputs`, `inputs`                           | `None`        |
+| `-m`, `--menu`       | Specify the root menu to start in.                        | `output-devices`, `input-devices`             | `None`        |
 | `--volume-step`      | Specify volume adjustment step as percentage.             | `1-25`                                        | `5`           |
 
 ## Contributing

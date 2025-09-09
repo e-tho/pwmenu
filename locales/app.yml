@@ -2,12 +2,12 @@ _version: 2
 menus:
   main:
     options:
-      outputs:
+      output_devices:
         name:
           en: "Output Devices"
           fr: "Périphériques de sortie"
           de: "Ausgabegeräte"
-      inputs:
+      input_devices:
         name:
           en: "Input Devices"
           fr: "Périphériques d'entrée"
@@ -44,7 +44,7 @@ menus:
           en: "Select Stream"
           fr: "Sélectionner un flux"
           de: "Stream auswählen"
-  output:
+  output_devices:
     hint:
       en: "Select Output Device"
       fr: "Sélectionner un périphérique de sortie"
@@ -60,7 +60,7 @@ menus:
           en: "Select Output Device"
           fr: "Sélectionner un périphérique de sortie"
           de: "Ausgabegerät auswählen"
-  input:
+  input_devices:
     hint:
       en: "Select Input Device"
       fr: "Sélectionner un périphérique d'entrée"
@@ -142,11 +142,11 @@ notifications:
       en: "Audio system updated"
       fr: "Système audio actualisé"
       de: "Audiosystem wurde aktualisiert"
-    outputs_refreshed:
+    output_devices_refreshed:
       en: "Output devices updated"
       fr: "Périphériques de sortie actualisés"
       de: "Ausgabegeräte wurden aktualisiert"
-    inputs_refreshed:
+    input_devices_refreshed:
       en: "Input devices updated"
       fr: "Périphériques d'entrée actualisés"
       de: "Eingabegeräte wurden aktualisiert"
@@ -162,11 +162,11 @@ notifications:
       en: "Exited input streams menu"
       fr: "Menu des flux d'entrée quitté"
       de: "Eingabestreams-Menü wurde verlassen"
-    output_menu_exited:
+    output_devices_menu_exited:
       en: "Exited output devices menu"
       fr: "Menu des périphériques de sortie quitté"
       de: "Menü der Ausgabegeräte wurde verlassen"
-    input_menu_exited:
+    input_devices_menu_exited:
       en: "Exited input devices menu"
       fr: "Menu des périphériques d'entrée quitté"
       de: "Menü der Eingabegeräte wurde verlassen"

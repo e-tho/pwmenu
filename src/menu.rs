@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum MainMenuOptions {
-    ShowOutputMenu,
-    ShowInputMenu,
+    ShowOutputDeviceMenu,
+    ShowInputDeviceMenu,
     ShowOutputStreamsMenu,
     ShowInputStreamsMenu,
 }
@@ -19,10 +19,12 @@ pub enum MainMenuOptions {
 impl MainMenuOptions {
     pub fn from_string(option: &str) -> Option<Self> {
         match option {
-            s if s == t!("menus.main.options.outputs.name") => {
-                Some(MainMenuOptions::ShowOutputMenu)
+            s if s == t!("menus.main.options.output_devices.name") => {
+                Some(MainMenuOptions::ShowOutputDeviceMenu)
             }
-            s if s == t!("menus.main.options.inputs.name") => Some(MainMenuOptions::ShowInputMenu),
+            s if s == t!("menus.main.options.input_devices.name") => {
+                Some(MainMenuOptions::ShowInputDeviceMenu)
+            }
             s if s == t!("menus.main.options.output_streams.name") => {
                 Some(MainMenuOptions::ShowOutputStreamsMenu)
             }
@@ -35,8 +37,8 @@ impl MainMenuOptions {
 
     pub fn to_str(&self) -> Cow<'static, str> {
         match self {
-            MainMenuOptions::ShowOutputMenu => t!("menus.main.options.outputs.name"),
-            MainMenuOptions::ShowInputMenu => t!("menus.main.options.inputs.name"),
+            MainMenuOptions::ShowOutputDeviceMenu => t!("menus.main.options.output_devices.name"),
+            MainMenuOptions::ShowInputDeviceMenu => t!("menus.main.options.input_devices.name"),
             MainMenuOptions::ShowOutputStreamsMenu => t!("menus.main.options.output_streams.name"),
             MainMenuOptions::ShowInputStreamsMenu => t!("menus.main.options.input_streams.name"),
         }
@@ -68,47 +70,49 @@ impl StreamMenuOptions {
 }
 
 #[derive(Debug, Clone)]
-pub enum OutputMenuOptions {
+pub enum OutputDeviceMenuOptions {
     RefreshList,
     Device(String),
 }
 
-impl OutputMenuOptions {
+impl OutputDeviceMenuOptions {
     pub fn from_string(option: &str) -> Option<Self> {
         match option {
-            s if s == t!("menus.output.options.refresh.name") => {
-                Some(OutputMenuOptions::RefreshList)
+            s if s == t!("menus.output_devices.options.refresh.name") => {
+                Some(OutputDeviceMenuOptions::RefreshList)
             }
-            other => Some(OutputMenuOptions::Device(other.to_string())),
+            other => Some(OutputDeviceMenuOptions::Device(other.to_string())),
         }
     }
 
     pub fn to_str(&self) -> Cow<'static, str> {
         match self {
-            OutputMenuOptions::RefreshList => t!("menus.output.options.refresh.name"),
-            OutputMenuOptions::Device(_) => t!("menus.output.options.device.name"),
+            OutputDeviceMenuOptions::RefreshList => t!("menus.output_devices.options.refresh.name"),
+            OutputDeviceMenuOptions::Device(_) => t!("menus.output_devices.options.device.name"),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum InputMenuOptions {
+pub enum InputDeviceMenuOptions {
     RefreshList,
     Device(String),
 }
 
-impl InputMenuOptions {
+impl InputDeviceMenuOptions {
     pub fn from_string(option: &str) -> Option<Self> {
         match option {
-            s if s == t!("menus.input.options.refresh.name") => Some(InputMenuOptions::RefreshList),
-            other => Some(InputMenuOptions::Device(other.to_string())),
+            s if s == t!("menus.input_devices.options.refresh.name") => {
+                Some(InputDeviceMenuOptions::RefreshList)
+            }
+            other => Some(InputDeviceMenuOptions::Device(other.to_string())),
         }
     }
 
     pub fn to_str(&self) -> Cow<'static, str> {
         match self {
-            InputMenuOptions::RefreshList => t!("menus.input.options.refresh.name"),
-            InputMenuOptions::Device(_) => t!("menus.input.options.device.name"),
+            InputDeviceMenuOptions::RefreshList => t!("menus.input_devices.options.refresh.name"),
+            InputDeviceMenuOptions::Device(_) => t!("menus.input_devices.options.device.name"),
         }
     }
 }
@@ -319,8 +323,8 @@ impl Menu {
         spaces: usize,
     ) -> Result<Option<MainMenuOptions>> {
         let options = vec![
-            ("output", MainMenuOptions::ShowOutputMenu.to_str()),
-            ("input", MainMenuOptions::ShowInputMenu.to_str()),
+            ("output", MainMenuOptions::ShowOutputDeviceMenu.to_str()),
+            ("input", MainMenuOptions::ShowInputDeviceMenu.to_str()),
             (
                 "output_streams",
                 MainMenuOptions::ShowOutputStreamsMenu.to_str(),
@@ -393,7 +397,7 @@ impl Menu {
         Ok(None)
     }
 
-    pub async fn show_output_menu(
+    pub async fn show_output_device_menu(
         &self,
         launcher_command: &Option<String>,
         nodes: &[Node],
@@ -401,7 +405,7 @@ impl Menu {
         icon_type: &str,
         spaces: usize,
     ) -> Result<Option<String>> {
-        let refresh_text = OutputMenuOptions::RefreshList.to_str();
+        let refresh_text = OutputDeviceMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
 
         let mut input = self.get_icon_text(options_start, icon_type, spaces);
@@ -411,7 +415,7 @@ impl Menu {
             input.push_str(&format!("\n{node_display}"));
         }
 
-        let hint = t!("menus.output.hint");
+        let hint = t!("menus.output_devices.hint");
         let menu_output =
             self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
 
@@ -423,7 +427,7 @@ impl Menu {
         Ok(None)
     }
 
-    pub async fn show_input_menu(
+    pub async fn show_input_device_menu(
         &self,
         launcher_command: &Option<String>,
         nodes: &[Node],
@@ -431,7 +435,7 @@ impl Menu {
         icon_type: &str,
         spaces: usize,
     ) -> Result<Option<String>> {
-        let refresh_text = InputMenuOptions::RefreshList.to_str();
+        let refresh_text = InputDeviceMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
 
         let mut input = self.get_icon_text(options_start, icon_type, spaces);
@@ -441,7 +445,7 @@ impl Menu {
             input.push_str(&format!("\n{node_display}"));
         }
 
-        let hint = t!("menus.input.hint");
+        let hint = t!("menus.input_devices.hint");
         let menu_output =
             self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
 

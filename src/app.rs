@@ -1,7 +1,7 @@
 use crate::{
     icons::Icons,
     menu::{
-        DeviceMenuOptions, InputMenuOptions, MainMenuOptions, Menu, OutputMenuOptions,
+        DeviceMenuOptions, InputDeviceMenuOptions, MainMenuOptions, Menu, OutputDeviceMenuOptions,
         ProfileMenuOptions, StreamMenuOptions, VolumeMenuOptions,
     },
     notification::NotificationManager,
@@ -84,26 +84,26 @@ impl App {
         Ok(None)
     }
 
-    pub async fn run_output_menu(
+    pub async fn run_output_device_menu(
         &mut self,
         menu: &Menu,
         menu_command: &Option<String>,
         icon_type: &str,
         spaces: usize,
     ) -> Result<Option<String>> {
-        self.handle_output_menu(menu, menu_command, icon_type, spaces)
+        self.handle_output_device_menu(menu, menu_command, icon_type, spaces)
             .await?;
         Ok(None)
     }
 
-    pub async fn run_input_menu(
+    pub async fn run_input_device_menu(
         &mut self,
         menu: &Menu,
         menu_command: &Option<String>,
         icon_type: &str,
         spaces: usize,
     ) -> Result<Option<String>> {
-        self.handle_input_menu(menu, menu_command, icon_type, spaces)
+        self.handle_input_device_menu(menu, menu_command, icon_type, spaces)
             .await?;
         Ok(None)
     }
@@ -117,12 +117,12 @@ impl App {
         main_menu_option: MainMenuOptions,
     ) -> Result<Option<String>> {
         match main_menu_option {
-            MainMenuOptions::ShowOutputMenu => {
-                self.handle_output_menu(menu, menu_command, icon_type, spaces)
+            MainMenuOptions::ShowOutputDeviceMenu => {
+                self.handle_output_device_menu(menu, menu_command, icon_type, spaces)
                     .await?;
             }
-            MainMenuOptions::ShowInputMenu => {
-                self.handle_input_menu(menu, menu_command, icon_type, spaces)
+            MainMenuOptions::ShowInputDeviceMenu => {
+                self.handle_input_device_menu(menu, menu_command, icon_type, spaces)
                     .await?;
             }
             MainMenuOptions::ShowOutputStreamsMenu => {
@@ -257,7 +257,7 @@ impl App {
         None
     }
 
-    async fn handle_output_menu(
+    async fn handle_output_device_menu(
         &mut self,
         menu: &Menu,
         menu_command: &Option<String>,
@@ -268,7 +268,7 @@ impl App {
 
         while stay_in_output_menu {
             let should_stay = self
-                .handle_output_options(menu, menu_command, icon_type, spaces)
+                .handle_output_device_options(menu, menu_command, icon_type, spaces)
                 .await?;
 
             if !should_stay {
@@ -279,7 +279,7 @@ impl App {
         Ok(())
     }
 
-    async fn handle_output_options(
+    async fn handle_output_device_options(
         &mut self,
         menu: &Menu,
         menu_command: &Option<String>,
@@ -288,12 +288,12 @@ impl App {
     ) -> Result<bool> {
         let nodes = self.controller.get_output_nodes();
         let menu_result = menu
-            .show_output_menu(menu_command, &nodes, &self.controller, icon_type, spaces)
+            .show_output_device_menu(menu_command, &nodes, &self.controller, icon_type, spaces)
             .await?;
 
         match menu_result {
             Some(selection) => {
-                let refresh_text = OutputMenuOptions::RefreshList.to_str();
+                let refresh_text = OutputDeviceMenuOptions::RefreshList.to_str();
                 if selection == refresh_text.as_ref() {
                     Ok(true)
                 } else {
@@ -309,14 +309,14 @@ impl App {
             None => {
                 try_send_log!(
                     self.log_sender,
-                    t!("notifications.pw.output_menu_exited").to_string()
+                    t!("notifications.pw.output_devices_menu_exited").to_string()
                 );
                 Ok(false)
             }
         }
     }
 
-    async fn handle_input_menu(
+    async fn handle_input_device_menu(
         &mut self,
         menu: &Menu,
         menu_command: &Option<String>,
@@ -327,7 +327,7 @@ impl App {
 
         while stay_in_input_menu {
             let should_stay = self
-                .handle_input_options(menu, menu_command, icon_type, spaces)
+                .handle_input_device_options(menu, menu_command, icon_type, spaces)
                 .await?;
 
             if !should_stay {
@@ -338,7 +338,7 @@ impl App {
         Ok(())
     }
 
-    async fn handle_input_options(
+    async fn handle_input_device_options(
         &mut self,
         menu: &Menu,
         menu_command: &Option<String>,
@@ -347,12 +347,12 @@ impl App {
     ) -> Result<bool> {
         let nodes = self.controller.get_input_nodes();
         let menu_result = menu
-            .show_input_menu(menu_command, &nodes, &self.controller, icon_type, spaces)
+            .show_input_device_menu(menu_command, &nodes, &self.controller, icon_type, spaces)
             .await?;
 
         match menu_result {
             Some(selection) => {
-                let refresh_text = InputMenuOptions::RefreshList.to_str();
+                let refresh_text = InputDeviceMenuOptions::RefreshList.to_str();
                 if selection == refresh_text.as_ref() {
                     Ok(true)
                 } else {
@@ -375,7 +375,7 @@ impl App {
             None => {
                 try_send_log!(
                     self.log_sender,
-                    t!("notifications.pw.input_menu_exited").to_string()
+                    t!("notifications.pw.input_devices_menu_exited").to_string()
                 );
                 Ok(false)
             }
