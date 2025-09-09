@@ -72,7 +72,12 @@ async fn main() -> Result<()> {
                 .short('m')
                 .long("menu")
                 .takes_value(true)
-                .possible_values(["output-devices", "input-devices"])
+                .possible_values([
+                    "output-devices",
+                    "input-devices",
+                    "output-streams",
+                    "input-streams",
+                ])
                 .help("Start in the specified root menu"),
         )
         .arg(
@@ -151,6 +156,14 @@ async fn run_app_loop(
             }
             "input-devices" => {
                 app.run_input_device_menu(menu, command_str, icon_type, spaces)
+                    .await
+            }
+            "output-streams" => {
+                app.run_output_streams_menu(menu, command_str, icon_type, spaces)
+                    .await
+            }
+            "input-streams" => {
+                app.run_input_streams_menu(menu, command_str, icon_type, spaces)
                     .await
             }
             _ => Err(anyhow!("Invalid menu value: {menu_name}")),
