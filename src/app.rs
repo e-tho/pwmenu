@@ -236,7 +236,7 @@ impl App {
                 if selection == refresh_text.as_ref() {
                     Ok(true)
                 } else {
-                    if let Some(stream) = self.find_stream_by_name(&streams, &selection) {
+                    if let Some(stream) = self.find_stream_by_name(&streams, &selection, menu) {
                         self.handle_volume_menu(
                             menu,
                             menu_command,
@@ -263,7 +263,7 @@ impl App {
         }
     }
 
-    fn find_stream_by_name(&self, streams: &[Node], selection: &str) -> Option<Node> {
+    fn find_stream_by_name(&self, streams: &[Node], selection: &str, menu: &Menu) -> Option<Node> {
         let base_selection = if let Some(pos) = selection.find(" [") {
             &selection[..pos]
         } else {
@@ -271,7 +271,7 @@ impl App {
         };
 
         for stream in streams {
-            let display_name = self.controller.get_application_display_name(stream);
+            let display_name = menu.format_stream_display_name(stream, &self.controller);
             if display_name == base_selection {
                 return Some(stream.clone());
             }
@@ -692,7 +692,7 @@ impl App {
         let device_name = if node.device_id.is_some() {
             self.controller.get_device_name(node.device_id.unwrap_or(0))
         } else {
-            self.controller.get_application_display_name(node)
+            menu.format_stream_display_name(node, &self.controller)
         };
 
         let volume_display = if node.volume.muted {

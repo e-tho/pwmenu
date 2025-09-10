@@ -61,6 +61,7 @@ pub struct Node {
     pub is_default: bool,
     pub device_id: Option<u32>,
     pub ports: Vec<u32>,
+    pub media_name: Option<String>,
 }
 
 pub struct NodeInternal {
@@ -80,6 +81,7 @@ pub struct NodeInternal {
     pub listener: Option<pipewire::node::NodeListener>,
     pub info_listener: Option<pipewire::node::NodeListener>,
     pub has_received_params: bool,
+    pub media_name: Option<String>,
 }
 
 impl NodeInternal {
@@ -96,6 +98,7 @@ impl NodeInternal {
             is_default: self.is_default,
             device_id: self.device_id,
             ports: self.ports.clone(),
+            media_name: self.media_name.clone(),
         }
     }
 }
@@ -146,6 +149,8 @@ impl Store {
             .map(|p| p.id)
             .collect();
 
+        let media_name = props.get("media.name").map(str::to_string);
+
         let mut node = NodeInternal {
             id: global.id,
             name: name.clone(),
@@ -164,6 +169,7 @@ impl Store {
             listener: None,
             info_listener: None,
             has_received_params: false,
+            media_name,
         };
 
         let store_weak = Rc::downgrade(store_rc);
@@ -219,10 +225,35 @@ impl Store {
             .info({
                 let store_weak = store_weak.clone();
                 let graph_tx = graph_tx_clone.clone();
+                let node_id = global.id;
 
-                move |_info| {
+                move |info| {
                     if let Some(store_rc) = store_weak.upgrade() {
-                        crate::pw::graph::update_graph(&store_rc, &graph_tx);
+                        let updated = match store_rc.try_borrow_mut() {
+                            Ok(mut store) => {
+                                if let Some(node) = store.nodes.get_mut(&node_id) {
+                                    let mut node_updated = false;
+
+                                    if let Some(props) = info.props() {
+                                        let media_name =
+                                            props.get("media.name").map(str::to_string);
+                                        if node.media_name != media_name {
+                                            node.media_name = media_name;
+                                            node_updated = true;
+                                        }
+                                    }
+
+                                    node_updated
+                                } else {
+                                    false
+                                }
+                            }
+                            Err(_) => false,
+                        };
+
+                        if updated {
+                            crate::pw::graph::update_graph(&store_rc, &graph_tx);
+                        }
                     }
                 }
             })

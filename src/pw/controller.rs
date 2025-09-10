@@ -385,7 +385,11 @@ impl Controller {
         }
     }
 
-    pub fn get_application_display_name(&self, node: &Node) -> String {
+    pub fn get_application_name(&self, node: &Node) -> String {
+        if let Some(app_name) = &node.application_name {
+            return Self::extract_display_name_from_identifier(app_name);
+        }
+
         if let Some(nick) = &node.nick {
             return nick.clone();
         }
@@ -394,11 +398,11 @@ impl Controller {
             return Self::extract_display_name_from_identifier(desc);
         }
 
-        if let Some(app_name) = &node.application_name {
-            return Self::extract_display_name_from_identifier(app_name);
-        }
-
         node.name.clone()
+    }
+
+    pub fn get_media_name(&self, node: &Node) -> Option<String> {
+        node.media_name.clone()
     }
 
     pub async fn create_link(&self, output_node: u32, input_node: u32) -> Result<()> {

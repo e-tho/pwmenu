@@ -316,6 +316,16 @@ impl Menu {
         }
     }
 
+    pub fn format_stream_display_name(&self, node: &Node, controller: &Controller) -> String {
+        let app_name = controller.get_application_name(node);
+
+        if let Some(media_name) = controller.get_media_name(node) {
+            format!("{app_name} - {media_name}")
+        } else {
+            app_name
+        }
+    }
+
     pub async fn show_main_menu(
         &self,
         launcher_command: &Option<String>,
@@ -362,7 +372,7 @@ impl Menu {
         let mut input = self.get_icon_text(options_start, icon_type, spaces);
 
         for stream in streams {
-            let display_name = controller.get_application_display_name(stream);
+            let display_name = self.format_stream_display_name(stream, controller);
 
             let volume_str = if stream.volume.muted {
                 format!(" [{}]", t!("menus.volume.muted"))
