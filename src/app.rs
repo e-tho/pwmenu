@@ -251,15 +251,13 @@ impl App {
                 }
             }
             None => {
-                let menu_type = if is_output {
-                    "output_streams"
+                let message = if is_output {
+                    t!("notifications.pw.output_streams_menu_exited")
                 } else {
-                    "input_streams"
+                    t!("notifications.pw.input_streams_menu_exited")
                 };
-                try_send_log!(
-                    self.log_sender,
-                    t!("notifications.pw.{}_menu_exited", menu_type = menu_type).to_string()
-                );
+
+                try_send_log!(self.log_sender, message.to_string());
                 Ok(false)
             }
         }
