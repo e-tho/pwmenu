@@ -235,11 +235,17 @@ impl Store {
                                     let mut node_updated = false;
 
                                     if let Some(props) = info.props() {
-                                        let media_name =
-                                            props.get("media.name").map(str::to_string);
-                                        if node.media_name != media_name {
-                                            node.media_name = media_name;
-                                            node_updated = true;
+                                        if matches!(
+                                            node.node_type,
+                                            NodeType::StreamOutputAudio
+                                                | NodeType::StreamInputAudio
+                                        ) {
+                                            let media_name =
+                                                props.get("media.name").map(str::to_string);
+                                            if node.media_name != media_name {
+                                                node.media_name = media_name;
+                                                node_updated = true;
+                                            }
                                         }
                                     }
 
