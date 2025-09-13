@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
+use log::{debug, info};
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
 
 use crate::pw::{
     devices::{DeviceType, Profile},
@@ -48,16 +48,15 @@ pub struct DeviceInfo {
 
 pub struct Controller {
     engine: Arc<PwEngine>,
-    log_sender: UnboundedSender<String>,
 }
 
 impl Controller {
-    pub async fn new(log_sender: UnboundedSender<String>) -> Result<Self> {
+    pub async fn new() -> Result<Self> {
         let engine = Arc::new(PwEngine::new().await?);
 
-        try_send_log!(log_sender, "PipeWire controller initialized".to_string());
+        info!("{}", t!("notifications.pw.initialized"));
 
-        Ok(Self { engine, log_sender })
+        Ok(Self { engine })
     }
 
     pub async fn wait_for_initialization(&self) -> Result<()> {
@@ -295,13 +294,10 @@ impl Controller {
         };
 
         if result.is_ok() {
-            try_send_log!(
-                self.log_sender,
-                format!(
-                    "Set volume for {} to {}%",
-                    node.description.as_ref().unwrap_or(&node.name),
-                    (volume * 100.0) as u32
-                )
+            info!(
+                "Set volume for {} to {}%",
+                node.description.as_ref().unwrap_or(&node.name),
+                (volume * 100.0) as u32
             );
         }
 
@@ -360,13 +356,10 @@ impl Controller {
         };
 
         if result.is_ok() {
-            try_send_log!(
-                self.log_sender,
-                format!(
-                    "{} {}",
-                    if mute { "Muted" } else { "Unmuted" },
-                    node.description.as_ref().unwrap_or(&node.name)
-                )
+            info!(
+                "{} {}",
+                if mute { "Muted" } else { "Unmuted" },
+                node.description.as_ref().unwrap_or(&node.name)
             );
         }
 
@@ -413,10 +406,7 @@ impl Controller {
             let output_name = graph.nodes.get(&output_node).map_or("unknown", |n| &n.name);
             let input_name = graph.nodes.get(&input_node).map_or("unknown", |n| &n.name);
 
-            try_send_log!(
-                self.log_sender,
-                format!("Created link from {output_name} to {input_name}")
-            );
+            debug!("Created link from {output_name} to {input_name}");
         }
 
         result
@@ -430,10 +420,7 @@ impl Controller {
             let output_name = graph.nodes.get(&output_node).map_or("unknown", |n| &n.name);
             let input_name = graph.nodes.get(&input_node).map_or("unknown", |n| &n.name);
 
-            try_send_log!(
-                self.log_sender,
-                format!("Removed link from {output_name} to {input_name}")
-            );
+            debug!("Removed link from {output_name} to {input_name}");
         }
 
         result
@@ -444,10 +431,7 @@ impl Controller {
 
         if result.is_ok() {
             if let Some(node) = self.get_node(node_id) {
-                try_send_log!(
-                    self.log_sender,
-                    format!("Set default output to {}", node.name)
-                );
+                debug!("Set default output to {}", node.name);
             }
         }
 
@@ -459,10 +443,7 @@ impl Controller {
 
         if result.is_ok() {
             if let Some(node) = self.get_node(node_id) {
-                try_send_log!(
-                    self.log_sender,
-                    format!("Set default input to {}", node.name)
-                );
+                debug!("Set default input to {}", node.name);
             }
         }
 
@@ -544,12 +525,9 @@ impl Controller {
         if result.is_ok() {
             if let Some(device) = self.engine.graph().devices.get(&device_id) {
                 if let Some(profile) = device.profiles.iter().find(|p| p.index == profile_index) {
-                    try_send_log!(
-                        self.log_sender,
-                        format!(
-                            "Switched device {} to profile: {}",
-                            device.name, profile.description
-                        )
+                    debug!(
+                        "Switched device {} to profile: {}",
+                        device.name, profile.description
                     );
                 }
             }

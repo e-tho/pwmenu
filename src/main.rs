@@ -4,7 +4,6 @@ use pwmenu::{app::App, icons::Icons, launcher::LauncherType, menu::Menu};
 use rust_i18n::{i18n, set_locale};
 use std::{env, sync::Arc};
 use sys_locale::get_locale;
-use tokio::sync::mpsc::unbounded_channel;
 
 i18n!("locales", fallback = "en");
 
@@ -109,22 +108,13 @@ async fn main() -> Result<()> {
         .and_then(|s| s.parse::<usize>().ok())
         .ok_or_else(|| anyhow!("Invalid value for --spaces. Must be a positive integer."))?;
 
-    let (log_sender, mut log_receiver) = unbounded_channel::<String>();
-
     let volume_step = matches.get_one::<u8>("volume_step").copied().unwrap() as f32 / 100.0;
-
-    tokio::spawn(async move {
-        while let Some(log) = log_receiver.recv().await {
-            println!("LOG: {log}");
-        }
-    });
 
     run_app_loop(
         &menu,
         &command_str,
         &icon_type,
         spaces,
-        log_sender,
         icons,
         root_menu,
         volume_step,
@@ -140,12 +130,11 @@ async fn run_app_loop(
     command_str: &Option<String>,
     icon_type: &str,
     spaces: usize,
-    log_sender: tokio::sync::mpsc::UnboundedSender<String>,
     icons: Arc<Icons>,
     root_menu: Option<String>,
     volume_step: f32,
 ) -> Result<()> {
-    let mut app = App::new(menu.clone(), log_sender.clone(), icons.clone(), volume_step).await?;
+    let mut app = App::new(menu.clone(), icons.clone(), volume_step).await?;
 
     let result = if let Some(ref menu_name) = root_menu {
         app.wait_for_initialization().await?;

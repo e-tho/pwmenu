@@ -8,37 +8,28 @@ use crate::{
     pw::{controller::Controller, nodes::Node, Profile},
 };
 use anyhow::Result;
+use log::{debug, info};
 use rust_i18n::t;
 use std::sync::Arc;
-use tokio::{
-    sync::mpsc::UnboundedSender,
-    time::{sleep, Duration},
-};
+use tokio::time::{sleep, Duration};
 
 pub struct App {
     pub running: bool,
     controller: Controller,
-    log_sender: UnboundedSender<String>,
     notification_manager: Arc<NotificationManager>,
     volume_step: f32,
 }
 
 impl App {
-    pub async fn new(
-        _menu: Menu,
-        log_sender: UnboundedSender<String>,
-        icons: Arc<Icons>,
-        volume_step: f32,
-    ) -> Result<Self> {
-        let controller = Controller::new(log_sender.clone()).await?;
+    pub async fn new(_menu: Menu, icons: Arc<Icons>, volume_step: f32) -> Result<Self> {
+        let controller = Controller::new().await?;
         let notification_manager = Arc::new(NotificationManager::new(icons.clone()));
 
-        try_send_log!(log_sender, t!("notifications.pw.initialized").to_string());
+        info!("{}", t!("notifications.pw.initialized"));
 
         Ok(Self {
             running: true,
             controller,
-            log_sender,
             notification_manager,
             volume_step,
         })
@@ -72,10 +63,7 @@ impl App {
                     .await?;
                 }
                 None => {
-                    try_send_log!(
-                        self.log_sender,
-                        t!("notifications.pw.main_menu_exited").to_string()
-                    );
+                    debug!("{}", t!("notifications.pw.main_menu_exited"));
                     self.running = false;
                 }
             }
@@ -257,7 +245,7 @@ impl App {
                     t!("notifications.pw.input_streams_menu_exited")
                 };
 
-                try_send_log!(self.log_sender, message.to_string());
+                debug!("{message}");
                 Ok(false)
             }
         }
@@ -329,10 +317,7 @@ impl App {
                 }
             }
             None => {
-                try_send_log!(
-                    self.log_sender,
-                    t!("notifications.pw.output_devices_menu_exited").to_string()
-                );
+                debug!("{}", t!("notifications.pw.output_devices_menu_exited"));
                 Ok(false)
             }
         }
@@ -395,10 +380,7 @@ impl App {
                 }
             }
             None => {
-                try_send_log!(
-                    self.log_sender,
-                    t!("notifications.pw.input_devices_menu_exited").to_string()
-                );
+                debug!("{}", t!("notifications.pw.input_devices_menu_exited"));
                 Ok(false)
             }
         }
@@ -455,15 +437,12 @@ impl App {
                 } else if let Some(replacement) =
                     self.find_replacement_node(&current_node, is_output)
                 {
-                    try_send_log!(
-                        self.log_sender,
-                        format!(
-                            "Device node changed after profile switch, using new node: {}",
-                            replacement
-                                .description
-                                .as_ref()
-                                .unwrap_or(&replacement.name)
-                        )
+                    debug!(
+                        "Device node changed after profile switch, using new node: {}",
+                        replacement
+                            .description
+                            .as_ref()
+                            .unwrap_or(&replacement.name)
                     );
                     current_node = replacement;
                 } else {
@@ -544,12 +523,9 @@ impl App {
                 }
             }
         } else {
-            try_send_log!(
-                self.log_sender,
-                format!(
-                    "Exited device menu for {}",
-                    node.description.as_ref().unwrap_or(&node.name)
-                )
+            debug!(
+                "Exited device menu for {}",
+                node.description.as_ref().unwrap_or(&node.name)
             );
             Ok(false)
         }
@@ -613,10 +589,7 @@ impl App {
 
             Ok(true)
         } else {
-            try_send_log!(
-                self.log_sender,
-                format!("Exited profile menu for {device_name}")
-            );
+            debug!("Exited profile menu for {device_name}");
             Ok(false)
         }
     }
@@ -733,12 +706,9 @@ impl App {
             }
             Ok((true, Some(selected_option)))
         } else {
-            try_send_log!(
-                self.log_sender,
-                format!(
-                    "Exited volume menu for {}",
-                    node.description.as_ref().unwrap_or(&node.name)
-                )
+            debug!(
+                "Exited volume menu for {}",
+                node.description.as_ref().unwrap_or(&node.name)
             );
             Ok((false, None))
         }
@@ -764,7 +734,7 @@ impl App {
             device_name = display_name
         );
 
-        try_send_log!(self.log_sender, msg.to_string());
+        info!("{msg}");
         self.notification_manager
             .send_default_changed_notification(device_type, display_name)?;
 
@@ -789,7 +759,7 @@ impl App {
                 profile_name = &profile.description
             );
 
-            try_send_log!(self.log_sender, msg.to_string());
+            info!("{msg}");
             try_send_notification!(
                 self.notification_manager,
                 None,
@@ -816,7 +786,7 @@ impl App {
             volume = volume_percent
         );
 
-        try_send_log!(self.log_sender, msg.to_string());
+        info!("{msg}");
         self.notification_manager.send_volume_notification(
             &display_name,
             volume_percent,
@@ -840,7 +810,7 @@ impl App {
             )
         };
 
-        try_send_log!(self.log_sender, msg.to_string());
+        info!("{msg}");
         self.notification_manager.send_volume_notification(
             display_name,
             node.volume.percent(),
