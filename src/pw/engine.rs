@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context as AnyhowContext, Result};
 use libspa::param::ParamType;
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use pipewire::{
     core::Info as CoreInfo, main_loop::MainLoop, registry::GlobalObject, spa::utils::dict::DictRef,
     types::ObjectType,
@@ -29,11 +29,11 @@ impl PwEngine {
         let (graph_tx, graph_rx) = watch::channel(AudioGraph::default());
 
         let join_handle = tokio::task::spawn_blocking(move || {
-            info!("PipeWire blocking thread started.");
+            debug!("PipeWire blocking thread started.");
             if let Err(e) = run_pipewire_loop(cmd_rx, graph_tx) {
                 error!("PipeWire loop exited with error: {e:?}");
             } else {
-                info!("PipeWire loop exited cleanly.");
+                debug!("PipeWire loop exited cleanly.");
             }
         });
 
@@ -215,7 +215,7 @@ impl PwEngine {
 
 impl Drop for PwEngine {
     fn drop(&mut self) {
-        info!("PwEngine dropping. Sending Exit command.");
+        debug!("PwEngine dropping. Sending Exit command.");
         let _ = self.cmd_tx.send(PwCommand::Exit);
     }
 }
@@ -381,7 +381,7 @@ fn run_pipewire_loop(
     let initial_sync_seq = core.sync(0)?.seq();
     store.borrow_mut().initial_sync_seq = Some(initial_sync_seq);
 
-    info!("Starting PipeWire event loop...");
+    debug!("Starting PipeWire event loop...");
     let mainloop_clone = mainloop.clone();
     let loop_ref = mainloop.loop_();
 
@@ -408,7 +408,7 @@ fn run_pipewire_loop(
                 debug!("Received command: {cmd:?}");
 
                 if matches!(cmd, PwCommand::Exit) {
-                    info!("Exit command received. Quitting PipeWire loop.");
+                    debug!("Exit command received. Quitting PipeWire loop.");
                     mainloop_clone.quit();
                     break;
                 }
@@ -495,7 +495,7 @@ fn run_pipewire_loop(
             }
             Err(mpsc::error::TryRecvError::Empty) => {}
             Err(mpsc::error::TryRecvError::Disconnected) => {
-                info!("Command channel closed. Quitting PipeWire loop.");
+                debug!("Command channel closed. Quitting PipeWire loop.");
                 mainloop_clone.quit();
                 break;
             }

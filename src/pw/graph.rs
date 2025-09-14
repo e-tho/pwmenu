@@ -7,7 +7,7 @@ use crate::pw::{
     DeviceType, NodeType,
 };
 use anyhow::Result;
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use tokio::sync::watch;
 
@@ -151,7 +151,7 @@ impl Store {
 
     pub fn set_pwmenu_client_id(&mut self, id: u32) {
         self.pwmenu_client_id = Some(id);
-        info!("Internal PipeWire client ID set to: {id}");
+        debug!("Internal PipeWire client ID set to: {id}");
     }
 
     pub fn update_defaults_from_metadata(&mut self) {

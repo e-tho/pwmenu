@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use log::{debug, info};
+use log::debug;
 use std::sync::Arc;
 
 use crate::pw::{
@@ -53,8 +53,6 @@ pub struct Controller {
 impl Controller {
     pub async fn new() -> Result<Self> {
         let engine = Arc::new(PwEngine::new().await?);
-
-        info!("{}", t!("notifications.pw.initialized"));
 
         Ok(Self { engine })
     }
@@ -293,14 +291,6 @@ impl Controller {
             _ => self.engine.set_node_volume(node_id, volume).await,
         };
 
-        if result.is_ok() {
-            info!(
-                "Set volume for {} to {}%",
-                node.description.as_ref().unwrap_or(&node.name),
-                (volume * 100.0) as u32
-            );
-        }
-
         result
     }
 
@@ -354,14 +344,6 @@ impl Controller {
         } else {
             self.engine.set_node_mute(node_id, mute).await
         };
-
-        if result.is_ok() {
-            info!(
-                "{} {}",
-                if mute { "Muted" } else { "Unmuted" },
-                node.description.as_ref().unwrap_or(&node.name)
-            );
-        }
 
         result
     }

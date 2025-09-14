@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use log::{debug, info};
+use log::debug;
 use pipewire::metadata::{Metadata, MetadataListener};
 use serde_json::Value;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
@@ -45,7 +45,7 @@ impl MetadataManager {
     }
 
     pub fn register_metadata(&mut self, metadata: Metadata) {
-        info!("Registered metadata object");
+        debug!("Registered metadata object");
 
         let properties_clone = self.properties.clone();
         let update_callback = self.update_callback.take();
