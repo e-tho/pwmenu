@@ -714,10 +714,6 @@ impl App {
         }
     }
 
-    fn get_display_name(node: &Node) -> &str {
-        node.description.as_ref().unwrap_or(&node.name)
-    }
-
     async fn perform_set_default(&self, node: &Node, is_output: bool) -> Result<()> {
         let device_type = if is_output { "output" } else { "input" };
 
@@ -727,7 +723,7 @@ impl App {
             self.controller.set_default_source(node.id).await?;
         }
 
-        let display_name = Self::get_display_name(node);
+        let display_name = self.controller.get_node_base_name(node);
         let msg = t!(
             "notifications.pw.default_set",
             device_type = device_type,
@@ -736,7 +732,7 @@ impl App {
 
         info!("{msg}");
         self.notification_manager
-            .send_default_changed_notification(device_type, display_name)?;
+            .send_default_changed_notification(device_type, &display_name)?;
 
         Ok(())
     }
