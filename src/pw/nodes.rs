@@ -343,7 +343,7 @@ impl Store {
             .get_mut(&node_id)
             .ok_or_else(|| anyhow!("Node {node_id} not found for set_node_volume"))?;
 
-        let volume_value = volume.clamp(0.0, 1.0);
+        let volume_value = volume.clamp(0.0, 2.0);
 
         let mut buffer: Vec<u8> = Vec::new();
         let mut builder = Builder::new(&mut buffer);
