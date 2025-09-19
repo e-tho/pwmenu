@@ -92,14 +92,22 @@ impl NotificationManager {
             };
 
             match (node_type, volume_level) {
-                (NodeType::AudioSink, "overamplified") => "output_volume_overamplified",
-                (NodeType::AudioSink, "high") => "output_volume_high",
-                (NodeType::AudioSink, "medium") => "output_volume_medium",
-                (NodeType::AudioSink, "low") => "output_volume_low",
-                (NodeType::AudioSource, "overamplified") => "input_volume_overamplified",
-                (NodeType::AudioSource, "high") => "input_volume_high",
-                (NodeType::AudioSource, "medium") => "input_volume_medium",
-                (NodeType::AudioSource, "low") => "input_volume_low",
+                (NodeType::AudioSink | NodeType::StreamOutputAudio, "overamplified") => {
+                    "output_volume_overamplified"
+                }
+                (NodeType::AudioSource | NodeType::StreamInputAudio, "overamplified") => {
+                    "input_volume_overamplified"
+                }
+                (NodeType::AudioSink | NodeType::StreamOutputAudio, "high") => "output_volume_high",
+                (NodeType::AudioSink | NodeType::StreamOutputAudio, "medium") => {
+                    "output_volume_medium"
+                }
+                (NodeType::AudioSink | NodeType::StreamOutputAudio, "low") => "output_volume_low",
+                (NodeType::AudioSource | NodeType::StreamInputAudio, "high") => "input_volume_high",
+                (NodeType::AudioSource | NodeType::StreamInputAudio, "medium") => {
+                    "input_volume_medium"
+                }
+                (NodeType::AudioSource | NodeType::StreamInputAudio, "low") => "input_volume_low",
                 _ => "output_volume_medium",
             }
         }
