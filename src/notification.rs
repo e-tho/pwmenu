@@ -108,7 +108,7 @@ impl NotificationManager {
                     "input_volume_medium"
                 }
                 (NodeType::AudioSource | NodeType::StreamInputAudio, "low") => "input_volume_low",
-                _ => "output_volume_medium",
+                _ => "output_volume_high",
             }
         }
     }
