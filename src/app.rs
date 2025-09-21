@@ -771,6 +771,10 @@ impl App {
     async fn perform_volume_change(&self, node: &Node, delta: f32) -> Result<()> {
         let new_volume = (node.volume.linear + delta).clamp(0.0, 2.0);
 
+        if node.volume.muted {
+            self.controller.set_mute(node.id, false).await?;
+        }
+
         self.controller.set_volume(node.id, new_volume).await?;
 
         let volume_percent = (new_volume * 100.0).round() as u8;
