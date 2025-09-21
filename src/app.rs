@@ -796,19 +796,30 @@ impl App {
     async fn perform_mute_toggle(&self, node: &Node, mute: bool) -> Result<()> {
         self.controller.set_mute(node.id, mute).await?;
 
-        let display_name = node.description.as_ref().unwrap_or(&node.name);
+        let display_name = if node.device_id.is_some() {
+            self.controller.get_device_name(node.device_id.unwrap_or(0))
+        } else if let Some(media_name) = self.controller.get_media_name(node) {
+            format!(
+                "{} - {}",
+                self.controller.get_application_name(node),
+                media_name
+            )
+        } else {
+            self.controller.get_application_name(node)
+        };
+
         let msg = if mute {
-            t!("notifications.pw.device_muted", device_name = display_name)
+            t!("notifications.pw.device_muted", device_name = &display_name)
         } else {
             t!(
                 "notifications.pw.device_unmuted",
-                device_name = display_name
+                device_name = &display_name
             )
         };
 
         info!("{msg}");
         self.notification_manager.send_volume_notification(
-            display_name,
+            &display_name,
             node.volume.percent(),
             mute,
             &node.node_type,
