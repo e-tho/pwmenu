@@ -808,16 +808,13 @@ impl App {
             self.controller.get_application_name(node)
         };
 
-        let msg = if mute {
-            t!("notifications.pw.device_muted", device_name = &display_name)
+        let summary = if mute {
+            t!("notifications.pw.device_muted")
         } else {
-            t!(
-                "notifications.pw.device_unmuted",
-                device_name = &display_name
-            )
+            t!("notifications.pw.device_unmuted")
         };
 
-        info!("{msg}");
+        info!("{} {}", &summary, &display_name);
         self.notification_manager.send_volume_notification(
             &display_name,
             node.volume.percent(),

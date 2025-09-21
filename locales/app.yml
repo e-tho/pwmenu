@@ -187,13 +187,13 @@ notifications:
       fr: "Volume suramplifiè : %{volume}%"
       de: "Überverstärkte Lautstärke: %{volume}%"
     device_muted:
-      en: "%{device_name} muted"
-      fr: "%{device_name} en mode muet"
-      de: "%{device_name} ist stummgeschaltet"
+      en: "Muted"
+      fr: "Muet"
+      de: "Stummgeschaltet"
     device_unmuted:
-      en: "%{device_name} unmuted"
-      fr: "%{device_name} : son rétabli"
-      de: "%{device_name} ist nicht mehr stummgeschaltet"
+      en: "Unmuted"
+      fr: "Son rétabli"
+      de: "Ton an"
     profile_switched:
       en: "%{device_name}: %{profile_name} active"
       fr: "Profil %{profile_name} appliqué à %{device_name}"
