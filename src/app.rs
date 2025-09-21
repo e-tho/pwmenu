@@ -790,7 +790,7 @@ impl App {
         self.notification_manager.send_volume_notification(
             &display_name,
             volume_percent,
-            node.volume.muted,
+            false,
             &node.node_type,
         )?;
 
