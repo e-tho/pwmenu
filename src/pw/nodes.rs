@@ -240,11 +240,13 @@ impl Store {
                                             NodeType::StreamOutputAudio
                                                 | NodeType::StreamInputAudio
                                         ) {
-                                            let media_name =
-                                                props.get("media.name").map(str::to_string);
-                                            if node.media_name != media_name {
-                                                node.media_name = media_name;
-                                                node_updated = true;
+                                            if let Some(media_name) =
+                                                props.get("media.name").map(str::to_string)
+                                            {
+                                                if node.media_name != Some(media_name.clone()) {
+                                                    node.media_name = Some(media_name);
+                                                    node_updated = true;
+                                                }
                                             }
                                         }
                                     }
