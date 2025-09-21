@@ -5,6 +5,9 @@
     <a href="https://liberapay.com/e-tho"><img src="https://img.shields.io/badge/Liberapay-F6C915?style=flat&logo=liberapay&logoColor=333333" alt="Liberapay"></a>
   </p>
   <p>
+    <img src="./assets/demo.gif" alt="Demonstration of pwmenu: a launcher-driven audio manager for Linux" width="800">
+  </p>
+  <p>
     <a href="https://github.com/e-tho/iwmenu" title="Try iwmenu: a launcher-driven Wi-Fi manager for Linux"><img src="https://custom-icon-badges.demolab.com/badge/iwmenu-00AADD?style=for-the-badge&logo=wifi&logoSource=feather&logoColor=white" alt="iwmenu: a launcher-driven Wi-Fi manager for Linux" /></a>
     <a href="https://github.com/e-tho/bzmenu" title="Try bzmenu: a launcher-driven Bluetooth manager for Linux"><img src="https://custom-icon-badges.demolab.com/badge/bzmenu-1565C0?style=for-the-badge&logo=bluetooth&logoSource=feather&logoColor=white" alt="bzmenu: a launcher-driver Bluetooth manager for Linux" /></a>
   </p>
