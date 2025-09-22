@@ -81,6 +81,14 @@ Install the package:
 }
 ```
 
+### Arch Linux
+
+Install from AUR with your favorite helper:
+
+```shell
+paru -S pwmenu-git
+```
+
 ## Usage
 
 ### Supported launchers
