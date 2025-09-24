@@ -354,7 +354,7 @@ fn run_pipewire_loop(
                 let store = store_clone.clone();
                 let graph_tx = graph_tx_clone.clone();
                 move |id, seq, res, message| {
-                    if res == -2 && message.contains("enum params id:2") {
+                    if res == -2 && message.contains("enum params") {
                         debug!("PipeWire internal parameter enumeration failed: id {id}, seq {seq}: {message}");
                         return;
                     }
