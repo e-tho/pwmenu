@@ -106,7 +106,7 @@ impl NodeInternal {
 impl Store {
     pub fn add_node(
         &mut self,
-        registry: &Rc<pipewire::registry::Registry>,
+        registry: &Rc<pipewire::registry::RegistryRc>,
         global: &pipewire::registry::GlobalObject<&pipewire::spa::utils::dict::DictRef>,
         store_rc: &Rc<RefCell<Store>>,
         graph_tx: &watch::Sender<AudioGraph>,

@@ -10,8 +10,8 @@ homepage = "https://github.com/e-tho/pwmenu"
 repository = "https://github.com/e-tho/pwmenu"
 
 [dependencies]
-pipewire = "0.8"
-libspa = "0.8"
+pipewire = "0.9"
+libspa = "0.9"
 log = "0.4"
 env_logger = "0.11"
 serde = { version = "1.0", features = ["derive"], default-features = false }

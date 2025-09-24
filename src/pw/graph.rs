@@ -42,7 +42,7 @@ pub struct Store {
     pub default_source: Option<u32>,
     pub connection_status: ConnectionStatus,
     pub pwmenu_client_id: Option<u32>,
-    pub core: Rc<pipewire::core::Core>,
+    pub core: Rc<pipewire::core::CoreRc>,
     pub metadata_manager: Option<MetadataManager>,
     pub restoration_manager: RestorationManager,
     pub initial_sync_complete: bool,
@@ -54,7 +54,7 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn new(core: Rc<pipewire::core::Core>) -> Self {
+    pub fn new(core: Rc<pipewire::core::CoreRc>) -> Self {
         Self {
             nodes: HashMap::new(),
             devices: HashMap::new(),

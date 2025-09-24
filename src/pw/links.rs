@@ -82,7 +82,7 @@ impl LinkInternal {
 impl Store {
     pub fn add_port(
         &mut self,
-        registry: &Rc<pipewire::registry::Registry>,
+        registry: &Rc<pipewire::registry::RegistryRc>,
         global: &GlobalObject<&DictRef>,
     ) -> Result<()> {
         let props = global
@@ -139,7 +139,7 @@ impl Store {
 
     pub fn add_link(
         &mut self,
-        registry: &Rc<pipewire::registry::Registry>,
+        registry: &Rc<pipewire::registry::RegistryRc>,
         global: &GlobalObject<&DictRef>,
     ) -> Result<()> {
         let props = global

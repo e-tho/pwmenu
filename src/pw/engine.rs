@@ -2,8 +2,8 @@ use anyhow::{anyhow, Context as AnyhowContext, Result};
 use libspa::param::ParamType;
 use log::{debug, error, warn};
 use pipewire::{
-    core::Info as CoreInfo, main_loop::MainLoop, registry::GlobalObject, spa::utils::dict::DictRef,
-    types::ObjectType,
+    context::ContextRc, core::Info as CoreInfo, main_loop::MainLoopRc, registry::GlobalObject,
+    spa::utils::dict::DictRef, types::ObjectType,
 };
 use std::{cell::RefCell, rc::Rc, time::Duration};
 use tokio::{
@@ -227,19 +227,18 @@ fn run_pipewire_loop(
     pipewire::init();
     debug!("PipeWire library initialized.");
 
-    let mainloop = MainLoop::new(None).context("Failed to create PipeWire MainLoop")?;
-    let context =
-        pipewire::context::Context::new(&mainloop).context("Failed to create PipeWire Context")?;
+    let mainloop = MainLoopRc::new(None).context("Failed to create PipeWire MainLoop")?;
+    let context = ContextRc::new(&mainloop, None).context("Failed to create PipeWire Context")?;
     let core = Rc::new(
         context
-            .connect(Some(pipewire::properties::properties! {
+            .connect_rc(Some(pipewire::properties::properties! {
                 *pipewire::keys::APP_NAME => "pwmenu",
                 *pipewire::keys::APP_ID => "io.github.e-tho.pwmenu"
             }))
             .context("Failed to connect PipeWire Core")?,
     );
     let registry = Rc::new(
-        core.get_registry()
+        core.get_registry_rc()
             .context("Failed to get PipeWire Registry")?,
     );
     let store = Rc::new(RefCell::new(Store::new(core.clone())));
@@ -555,7 +554,7 @@ fn refresh_route_capable_devices(store_rc: &Rc<RefCell<Store>>) {
 impl Store {
     pub fn add_object(
         &mut self,
-        registry: &Rc<pipewire::registry::Registry>,
+        registry: &Rc<pipewire::registry::RegistryRc>,
         global: &GlobalObject<&DictRef>,
         store_rc: &Rc<RefCell<Store>>,
         graph_tx: &watch::Sender<AudioGraph>,

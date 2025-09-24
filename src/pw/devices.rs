@@ -231,7 +231,7 @@ impl DeviceInternal {
 impl Store {
     pub fn add_device(
         &mut self,
-        registry: &Rc<pipewire::registry::Registry>,
+        registry: &Rc<pipewire::registry::RegistryRc>,
         global: &GlobalObject<&DictRef>,
         store_rc: &Rc<RefCell<Store>>,
         graph_tx: &watch::Sender<AudioGraph>,
