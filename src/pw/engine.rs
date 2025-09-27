@@ -372,7 +372,6 @@ fn run_pipewire_loop(
                     store.borrow_mut().set_pwmenu_client_id(info.id());
                     debug!("Core: Info event received for client ID: {}", info.id());
 
-                    // Try to get from metadata first, fallback to core properties
                     let rate = if let Ok(store_ref) = store.try_borrow() {
                         if let Some(metadata_manager) = &store_ref.metadata_manager {
                             metadata_manager.get_sample_rate()
@@ -383,12 +382,7 @@ fn run_pipewire_loop(
                         None
                     };
 
-                    let final_rate = rate.or_else(|| {
-                        info.props()?
-                            .get("default.clock.rate")?
-                            .parse::<u32>()
-                            .ok()
-                    }).unwrap_or(48000);
+                    let final_rate = rate.unwrap_or(48000);
 
                     store.borrow_mut().default_clock_rate = final_rate;
                     debug!("Set default clock rate: {} Hz", final_rate);
