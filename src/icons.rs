@@ -57,13 +57,13 @@ impl Icons {
             IconDefinition::simple("audio-input-microphone-symbolic"),
         );
 
-        font_icons.insert("output_streams", '\u{f040c}');
+        font_icons.insert("output_streams", '\u{f040a}');
         xdg_icons.insert(
             "output_streams",
             IconDefinition::simple("media-playback-start-symbolic"),
         );
 
-        font_icons.insert("input_streams", '\u{f044b}');
+        font_icons.insert("input_streams", '\u{f044a}');
         xdg_icons.insert(
             "input_streams",
             IconDefinition::simple("media-record-symbolic"),
