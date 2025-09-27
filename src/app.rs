@@ -161,6 +161,28 @@ impl App {
         icon_type: &str,
         spaces: usize,
     ) -> Result<()> {
+        let mut stay_in_settings_menu = true;
+
+        while stay_in_settings_menu {
+            let should_stay = self
+                .handle_settings_options(menu, menu_command, icon_type, spaces)
+                .await?;
+
+            if !should_stay {
+                stay_in_settings_menu = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_settings_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<bool> {
         let option = menu
             .show_settings_menu(menu_command, icon_type, spaces)
             .await?;
@@ -168,9 +190,11 @@ impl App {
         if let Some(SettingsMenuOptions::SetSampleRate) = option {
             self.handle_sample_rate_menu(menu, menu_command, icon_type, spaces)
                 .await?;
+            Ok(true)
+        } else {
+            debug!("Exited settings menu");
+            Ok(false)
         }
-
-        Ok(())
     }
 
     async fn handle_sample_rate_menu(
@@ -180,6 +204,28 @@ impl App {
         icon_type: &str,
         spaces: usize,
     ) -> Result<()> {
+        let mut stay_in_sample_rate_menu = true;
+
+        while stay_in_sample_rate_menu {
+            let should_stay = self
+                .handle_sample_rate_options(menu, menu_command, icon_type, spaces)
+                .await?;
+
+            if !should_stay {
+                stay_in_sample_rate_menu = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_sample_rate_options(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<bool> {
         let current_rate = self.controller.get_system_default_sample_rate();
 
         let option = menu
@@ -188,9 +234,11 @@ impl App {
 
         if let Some(SampleRateMenuOptions::SelectRate(sample_rate)) = option {
             self.perform_sample_rate_change(sample_rate).await?;
+            Ok(true)
+        } else {
+            debug!("Exited sample rate menu");
+            Ok(false)
         }
-
-        Ok(())
     }
 
     async fn handle_output_streams_menu(
