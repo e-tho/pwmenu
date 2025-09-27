@@ -22,6 +22,27 @@ menus:
           en: "Input Streams"
           fr: "Flux d'entrée"
           de: "Eingabestreams"
+      settings:
+        name:
+          en: "Settings"
+          fr: "Paramètres"
+          de: "Einstellungen"
+  settings:
+    hint:
+      en: "Audio settings"
+      fr: "Paramètres audio"
+      de: "Audio-Einstellungen"
+    options:
+      set_sample_rate:
+        name:
+          en: "Set Sample Rate"
+          fr: "Définir la fréquence d'échantillonnage"
+          de: "Abtastrate einstellen"
+  sample_rate:
+    hint:
+      en: "Set sample rate [%{current_rate}]"
+      fr: "Définir la fréquence d'échantillonnage [%{current_rate}]"
+      de: "Abtastrate einstellen [%{current_rate}]"
   output_streams:
     hint:
       en: "Select Output Stream"
@@ -198,3 +219,7 @@ notifications:
       en: "%{device_name}: %{profile_name} active"
       fr: "Profil %{profile_name} appliqué à %{device_name}"
       de: "Profil %{profile_name} für %{device_name} aktiviert"
+    sample_rate_changed:
+      en: "Sample rate: %{sample_rate}"
+      fr: "Fréquence d'échantillonnage : %{sample_rate}"
+      de: "Abtastrate: %{sample_rate}"

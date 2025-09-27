@@ -6,6 +6,7 @@ use crate::pw::{
     restoration::RestorationManager,
     DeviceType, NodeType,
 };
+use anyhow::anyhow;
 use anyhow::Result;
 use log::{debug, error, warn};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
@@ -31,6 +32,7 @@ pub struct AudioGraph {
     pub initial_sync_complete: bool,
     pub params_sync_complete: bool,
     pub data_complete: bool,
+    pub default_clock_rate: u32,
 }
 
 pub struct Store {
@@ -51,6 +53,7 @@ pub struct Store {
     pub params_sync_seq: Option<i32>,
     pub data_complete: bool,
     pub refresh_pending: bool,
+    pub default_clock_rate: u32,
 }
 
 impl Store {
@@ -73,6 +76,7 @@ impl Store {
             params_sync_seq: None,
             data_complete: false,
             refresh_pending: false,
+            default_clock_rate: 48000,
         }
     }
 
@@ -104,6 +108,7 @@ impl Store {
             initial_sync_complete: self.initial_sync_complete,
             params_sync_complete: self.params_sync_complete,
             data_complete: self.data_complete,
+            default_clock_rate: self.default_clock_rate,
         }
     }
 
@@ -343,6 +348,19 @@ impl Store {
                 }
             }
         }
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: u32) -> Result<()> {
+        self.default_clock_rate = sample_rate;
+
+        if let Some(metadata_manager) = &self.metadata_manager {
+            metadata_manager.set_sample_rate(sample_rate)?;
+        } else {
+            return Err(anyhow!("Metadata manager not available"));
+        }
+
+        debug!("Set global sample rate to {} Hz", sample_rate);
+        Ok(())
     }
 }
 

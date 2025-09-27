@@ -75,6 +75,12 @@ impl Icons {
             IconDefinition::simple("applications-multimedia-symbolic"),
         );
 
+        font_icons.insert("settings", '\u{f08bb}');
+        xdg_icons.insert(
+            "settings",
+            IconDefinition::simple("preferences-system-symbolic"),
+        );
+
         font_icons.insert("virtual", '\u{f0471}');
         xdg_icons.insert(
             "virtual",
@@ -108,6 +114,18 @@ impl Icons {
         font_icons.insert("profile", '\u{f0384}');
         xdg_icons.insert(
             "profile",
+            IconDefinition::simple("audio-x-generic-symbolic"),
+        );
+
+        font_icons.insert("set_sample_rate", '\u{f147d}');
+        xdg_icons.insert(
+            "set_sample_rate",
+            IconDefinition::with_fallbacks(None, "filename-sample-rate-symbolic,view-media-visualization-symbolic,audio-x-generic-symbolic"),
+        );
+
+        font_icons.insert("sample_rate", '\u{f0384}');
+        xdg_icons.insert(
+            "sample_rate",
             IconDefinition::simple("audio-x-generic-symbolic"),
         );
 

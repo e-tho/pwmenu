@@ -55,5 +55,9 @@ pub enum PwCommand {
         direction: Option<RouteDirection>,
         result_sender: oneshot::Sender<Result<()>>,
     },
+    SetSampleRate {
+        sample_rate: u32,
+        result_sender: oneshot::Sender<Result<()>>,
+    },
     Exit,
 }

@@ -565,4 +565,12 @@ impl Controller {
 
         None
     }
+
+    pub async fn set_sample_rate(&self, sample_rate: u32) -> Result<()> {
+        self.engine.set_sample_rate(sample_rate).await
+    }
+
+    pub fn get_system_default_sample_rate(&self) -> u32 {
+        self.engine.graph().default_clock_rate
+    }
 }

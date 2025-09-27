@@ -14,6 +14,7 @@ pub enum MainMenuOptions {
     ShowInputDeviceMenu,
     ShowOutputStreamsMenu,
     ShowInputStreamsMenu,
+    ShowSettingsMenu,
 }
 
 impl MainMenuOptions {
@@ -31,6 +32,9 @@ impl MainMenuOptions {
             s if s == t!("menus.main.options.input_streams.name") => {
                 Some(MainMenuOptions::ShowInputStreamsMenu)
             }
+            s if s == t!("menus.main.options.settings.name") => {
+                Some(MainMenuOptions::ShowSettingsMenu)
+            }
             _ => None,
         }
     }
@@ -41,6 +45,31 @@ impl MainMenuOptions {
             MainMenuOptions::ShowInputDeviceMenu => t!("menus.main.options.input_devices.name"),
             MainMenuOptions::ShowOutputStreamsMenu => t!("menus.main.options.output_streams.name"),
             MainMenuOptions::ShowInputStreamsMenu => t!("menus.main.options.input_streams.name"),
+            MainMenuOptions::ShowSettingsMenu => t!("menus.main.options.settings.name"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SettingsMenuOptions {
+    SetSampleRate,
+}
+
+impl SettingsMenuOptions {
+    pub fn from_string(option: &str) -> Option<Self> {
+        match option {
+            s if s == t!("menus.settings.options.set_sample_rate.name") => {
+                Some(SettingsMenuOptions::SetSampleRate)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn to_str(&self) -> Cow<'static, str> {
+        match self {
+            SettingsMenuOptions::SetSampleRate => {
+                t!("menus.settings.options.set_sample_rate.name")
+            }
         }
     }
 }
@@ -201,6 +230,23 @@ impl VolumeMenuOptions {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SampleRateMenuOptions {
+    SelectRate(u32),
+}
+
+impl SampleRateMenuOptions {
+    pub fn from_string_with_rates(option: &str, rates: &[u32]) -> Option<Self> {
+        for &rate in rates {
+            let display_text = format!("{:.1} kHz", rate as f32 / 1000.0);
+            if option == display_text {
+                return Some(SampleRateMenuOptions::SelectRate(rate));
+            }
+        }
+        None
+    }
+}
+
 #[derive(Clone)]
 pub struct Menu {
     pub launcher_type: LauncherType,
@@ -343,6 +389,7 @@ impl Menu {
                 "input_streams",
                 MainMenuOptions::ShowInputStreamsMenu.to_str(),
             ),
+            ("settings", MainMenuOptions::ShowSettingsMenu.to_str()),
         ];
 
         let input = self.get_icon_text(options, icon_type, spaces);
@@ -352,6 +399,71 @@ impl Menu {
         if let Some(output) = menu_output {
             let cleaned_output = self.clean_menu_output(&output, icon_type);
             return Ok(MainMenuOptions::from_string(&cleaned_output));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn show_settings_menu(
+        &self,
+        launcher_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<Option<SettingsMenuOptions>> {
+        let options = vec![(
+            "set_sample_rate",
+            SettingsMenuOptions::SetSampleRate.to_str(),
+        )];
+
+        let input = self.get_icon_text(options, icon_type, spaces);
+        let hint = t!("menus.settings.hint");
+
+        let menu_output =
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
+
+        if let Some(output) = menu_output {
+            let cleaned_output = self.clean_menu_output(&output, icon_type);
+            return Ok(SettingsMenuOptions::from_string(&cleaned_output));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn show_sample_rate_menu(
+        &self,
+        launcher_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+        current_rate: u32,
+    ) -> Result<Option<SampleRateMenuOptions>> {
+        let common_rates = [44100, 48000, 96000, 192000];
+        let mut options = Vec::new();
+
+        for &rate in &common_rates {
+            let mut display_name = format!("{:.1} kHz", rate as f32 / 1000.0);
+
+            if rate == current_rate {
+                display_name.push_str(&format!(" {}", self.icons.get_icon("default", "generic")));
+            }
+
+            options.push(("profile", display_name));
+        }
+
+        let input = self.get_icon_text(options, icon_type, spaces);
+        let hint = t!(
+            "menus.sample_rate.hint",
+            current_rate = format!("{:.1} kHz", current_rate as f32 / 1000.0)
+        );
+
+        let menu_output =
+            self.run_launcher(launcher_command, Some(&input), icon_type, Some(&hint))?;
+
+        if let Some(output) = menu_output {
+            let cleaned_output = self.clean_menu_output(&output, icon_type);
+            return Ok(SampleRateMenuOptions::from_string_with_rates(
+                &cleaned_output,
+                &common_rates,
+            ));
         }
 
         Ok(None)

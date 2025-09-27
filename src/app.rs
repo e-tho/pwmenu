@@ -2,7 +2,8 @@ use crate::{
     icons::Icons,
     menu::{
         DeviceMenuOptions, InputDeviceMenuOptions, MainMenuOptions, Menu, OutputDeviceMenuOptions,
-        ProfileMenuOptions, StreamMenuOptions, VolumeMenuOptions,
+        ProfileMenuOptions, SampleRateMenuOptions, SettingsMenuOptions, StreamMenuOptions,
+        VolumeMenuOptions,
     },
     notification::NotificationManager,
     pw::{controller::Controller, nodes::Node, Profile},
@@ -145,8 +146,51 @@ impl App {
                 self.handle_input_streams_menu(menu, menu_command, icon_type, spaces)
                     .await?;
             }
+            MainMenuOptions::ShowSettingsMenu => {
+                self.handle_settings_menu(menu, menu_command, icon_type, spaces)
+                    .await?;
+            }
         }
         Ok(None)
+    }
+
+    async fn handle_settings_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<()> {
+        let option = menu
+            .show_settings_menu(menu_command, icon_type, spaces)
+            .await?;
+
+        if let Some(SettingsMenuOptions::SetSampleRate) = option {
+            self.handle_sample_rate_menu(menu, menu_command, icon_type, spaces)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn handle_sample_rate_menu(
+        &mut self,
+        menu: &Menu,
+        menu_command: &Option<String>,
+        icon_type: &str,
+        spaces: usize,
+    ) -> Result<()> {
+        let current_rate = self.controller.get_system_default_sample_rate();
+
+        let option = menu
+            .show_sample_rate_menu(menu_command, icon_type, spaces, current_rate)
+            .await?;
+
+        if let Some(SampleRateMenuOptions::SelectRate(sample_rate)) = option {
+            self.perform_sample_rate_change(sample_rate).await?;
+        }
+
+        Ok(())
     }
 
     async fn handle_output_streams_menu(
@@ -825,6 +869,27 @@ impl App {
             mute,
             &node.node_type,
         )?;
+
+        Ok(())
+    }
+
+    async fn perform_sample_rate_change(&self, sample_rate: u32) -> Result<()> {
+        self.controller.set_sample_rate(sample_rate).await?;
+
+        let rate_khz = sample_rate as f32 / 1000.0;
+        let msg = t!(
+            "notifications.pw.sample_rate_changed",
+            sample_rate = format!("{:.1} kHz", rate_khz)
+        );
+
+        info!("{msg}");
+        try_send_notification!(
+            self.notification_manager,
+            Some("Sample Rate Changed".to_string()),
+            Some(msg.to_string()),
+            Some("profile"),
+            None
+        );
 
         Ok(())
     }

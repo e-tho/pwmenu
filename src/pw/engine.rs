@@ -211,6 +211,14 @@ impl PwEngine {
         })
         .await
     }
+
+    pub async fn set_sample_rate(&self, sample_rate: u32) -> Result<()> {
+        self.send_command_and_wait(|rs| PwCommand::SetSampleRate {
+            sample_rate,
+            result_sender: rs,
+        })
+        .await
+    }
 }
 
 impl Drop for PwEngine {
@@ -267,27 +275,42 @@ fn run_pipewire_loop(
 
                     if global.type_ == ObjectType::Metadata {
                         if let Some(props) = &global.props {
-                            if let Some("default") = props.get("metadata.name") {
-                                match registry
-                                    .bind::<pipewire::metadata::Metadata, &DictRef>(global)
-                                {
-                                    Ok(metadata) => {
-                                        debug!("Found and bound to default metadata object");
-                                        if let Ok(mut store) = store_rc.try_borrow_mut() {
-                                            if let Some(mm) = &mut store.metadata_manager {
-                                                mm.register_metadata(metadata);
-                                                debug!("Registered default metadata object");
-                                            } else {
-                                                debug!("Metadata manager not initialized in store");
+                            let metadata_name = props.get("metadata.name");
+
+                            match metadata_name {
+                                Some("default") => {
+                                    match registry
+                                        .bind::<pipewire::metadata::Metadata, &DictRef>(global)
+                                    {
+                                        Ok(metadata) => {
+                                            debug!("Found and bound to default metadata object");
+                                            if let Ok(mut store) = store_rc.try_borrow_mut() {
+                                                if let Some(mm) = &mut store.metadata_manager {
+                                                    mm.register_default_metadata(metadata);
+                                                }
                                             }
-                                        } else {
-                                            error!("Could not borrow store mutably to register metadata");
                                         }
-                                    }
-                                    Err(e) => {
-                                        error!("Failed to bind to metadata object: {e}");
+                                        Err(e) => error!("Failed to bind to default metadata: {e}"),
                                     }
                                 }
+                                Some("settings") => {
+                                    match registry
+                                        .bind::<pipewire::metadata::Metadata, &DictRef>(global)
+                                    {
+                                        Ok(metadata) => {
+                                            debug!("Found and bound to settings metadata object");
+                                            if let Ok(mut store) = store_rc.try_borrow_mut() {
+                                                if let Some(mm) = &mut store.metadata_manager {
+                                                    mm.register_settings_metadata(metadata);
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to bind to settings metadata: {e}")
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
                     }
@@ -348,6 +371,27 @@ fn run_pipewire_loop(
                 move |info: &CoreInfo| {
                     store.borrow_mut().set_pwmenu_client_id(info.id());
                     debug!("Core: Info event received for client ID: {}", info.id());
+
+                    // Try to get from metadata first, fallback to core properties
+                    let rate = if let Ok(store_ref) = store.try_borrow() {
+                        if let Some(metadata_manager) = &store_ref.metadata_manager {
+                            metadata_manager.get_sample_rate()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    let final_rate = rate.or_else(|| {
+                        info.props()?
+                            .get("default.clock.rate")?
+                            .parse::<u32>()
+                            .ok()
+                    }).unwrap_or(48000);
+
+                    store.borrow_mut().default_clock_rate = final_rate;
+                    debug!("Set default clock rate: {} Hz", final_rate);
                 }
             })
             .error({
@@ -483,6 +527,11 @@ fn run_pipewire_loop(
                             .borrow_mut()
                             .set_device_mute(device_id, mute, direction),
                     ),
+                    PwCommand::SetSampleRate {
+                        sample_rate,
+                        result_sender,
+                    } => result_sender.send(store.borrow_mut().set_sample_rate(sample_rate)),
+
                     PwCommand::Exit => unreachable!("Exit handled above"),
                 };
 
