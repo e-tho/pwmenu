@@ -450,81 +450,110 @@ fn run_pipewire_loop(
                     break;
                 }
 
-                let cmd_processing_result = match cmd {
+                let (cmd_processing_result, should_update_graph) = match cmd {
                     PwCommand::SetNodeVolume {
                         node_id,
                         volume,
                         result_sender,
-                    } => result_sender.send(store.borrow_mut().set_node_volume(node_id, volume)),
+                    } => (
+                        result_sender.send(store.borrow_mut().set_node_volume(node_id, volume)),
+                        true,
+                    ),
                     PwCommand::SetNodeMute {
                         node_id,
                         mute,
                         result_sender,
-                    } => result_sender.send(store.borrow_mut().set_node_mute(node_id, mute)),
+                    } => (
+                        result_sender.send(store.borrow_mut().set_node_mute(node_id, mute)),
+                        true,
+                    ),
                     PwCommand::CreateLink {
                         output_node,
                         input_node,
                         result_sender,
-                    } => {
-                        result_sender.send(store.borrow_mut().create_link(output_node, input_node))
-                    }
+                    } => (
+                        result_sender.send(store.borrow_mut().create_link(output_node, input_node)),
+                        true,
+                    ),
                     PwCommand::RemoveLink {
                         output_node,
                         input_node,
                         result_sender,
-                    } => {
-                        result_sender.send(store.borrow_mut().remove_link(output_node, input_node))
-                    }
+                    } => (
+                        result_sender.send(store.borrow_mut().remove_link(output_node, input_node)),
+                        true,
+                    ),
                     PwCommand::SetDefaultSink {
                         node_id,
                         result_sender,
-                    } => result_sender.send(store.borrow_mut().set_default_sink(node_id)),
+                    } => (
+                        result_sender.send(store.borrow_mut().set_default_sink(node_id)),
+                        false,
+                    ),
                     PwCommand::SetDefaultSource {
                         node_id,
                         result_sender,
-                    } => result_sender.send(store.borrow_mut().set_default_source(node_id)),
+                    } => (
+                        result_sender.send(store.borrow_mut().set_default_source(node_id)),
+                        false,
+                    ),
                     PwCommand::SwitchDeviceProfile {
                         device_id,
                         profile_index,
                         result_sender,
-                    } => result_sender.send(
-                        store
-                            .borrow_mut()
-                            .switch_device_profile(device_id, profile_index),
+                    } => (
+                        result_sender.send(
+                            store
+                                .borrow_mut()
+                                .switch_device_profile(device_id, profile_index),
+                        ),
+                        true,
                     ),
                     PwCommand::SwitchDeviceProfileWithRestoration {
                         device_id,
                         profile_index,
                         result_sender,
-                    } => result_sender.send(
-                        store
-                            .borrow_mut()
-                            .switch_device_profile_with_restoration(device_id, profile_index),
+                    } => (
+                        result_sender.send(
+                            store
+                                .borrow_mut()
+                                .switch_device_profile_with_restoration(device_id, profile_index),
+                        ),
+                        true,
                     ),
                     PwCommand::SetDeviceVolume {
                         device_id,
                         volume,
                         direction,
                         result_sender,
-                    } => result_sender.send(
-                        store
-                            .borrow_mut()
-                            .set_device_volume(device_id, volume, direction),
+                    } => (
+                        result_sender.send(
+                            store
+                                .borrow_mut()
+                                .set_device_volume(device_id, volume, direction),
+                        ),
+                        true,
                     ),
                     PwCommand::SetDeviceMute {
                         device_id,
                         mute,
                         direction,
                         result_sender,
-                    } => result_sender.send(
-                        store
-                            .borrow_mut()
-                            .set_device_mute(device_id, mute, direction),
+                    } => (
+                        result_sender.send(
+                            store
+                                .borrow_mut()
+                                .set_device_mute(device_id, mute, direction),
+                        ),
+                        true,
                     ),
                     PwCommand::SetSampleRate {
                         sample_rate,
                         result_sender,
-                    } => result_sender.send(store.borrow_mut().set_sample_rate(sample_rate)),
+                    } => (
+                        result_sender.send(store.borrow_mut().set_sample_rate(sample_rate)),
+                        true,
+                    ),
 
                     PwCommand::Exit => unreachable!("Exit handled above"),
                 };
@@ -533,7 +562,9 @@ fn run_pipewire_loop(
                     debug!("Command result receiver dropped.");
                 }
 
-                update_graph(&store, &graph_tx);
+                if should_update_graph {
+                    update_graph(&store, &graph_tx);
+                }
             }
             Err(mpsc::error::TryRecvError::Empty) => {}
             Err(mpsc::error::TryRecvError::Disconnected) => {

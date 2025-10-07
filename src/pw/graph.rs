@@ -210,7 +210,6 @@ impl Store {
             }
         }
 
-        // Similar logic for source (simplified for brevity)
         if let Some(default_source_name) = metadata_manager.get_default_source() {
             for (node_id, node) in &mut self.nodes {
                 if matches!(node.node_type, crate::pw::nodes::NodeType::AudioSource) {

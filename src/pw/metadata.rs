@@ -11,7 +11,7 @@ pub struct MetadataManager {
     settings_properties: Rc<RefCell<HashMap<String, String>>>,
     _default_listener: Option<MetadataListener>,
     _settings_listener: Option<MetadataListener>,
-    update_callback: Option<Box<dyn Fn()>>,
+    update_callback: Option<Rc<dyn Fn()>>,
 }
 
 impl Default for MetadataManager {
@@ -46,7 +46,7 @@ impl MetadataManager {
     where
         F: Fn() + 'static,
     {
-        self.update_callback = Some(Box::new(callback));
+        self.update_callback = Some(Rc::new(callback));
         self
     }
 
@@ -54,7 +54,7 @@ impl MetadataManager {
         debug!("Registered default metadata object");
 
         let properties_clone = self.properties.clone();
-        let update_callback = self.update_callback.take();
+        let update_callback = self.update_callback.clone();
 
         let listener = metadata
             .add_listener_local()
@@ -100,7 +100,7 @@ impl MetadataManager {
 
     pub fn register_settings_metadata(&mut self, metadata: Metadata) {
         let properties_clone = self.settings_properties.clone();
-        let update_callback = self.update_callback.take();
+        let update_callback = self.update_callback.clone();
 
         let listener = metadata
             .add_listener_local()
