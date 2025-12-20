@@ -23,6 +23,7 @@ pub enum LauncherType {
     Rofi,
     Dmenu,
     Walker,
+    Bemenu,
     Custom,
 }
 
@@ -41,6 +42,9 @@ pub enum LauncherCommand {
     },
     Walker {
         placeholder: Option<String>,
+    },
+    Bemenu {
+        prompt: Option<String>,
     },
     Custom {
         program: String,
@@ -97,6 +101,13 @@ impl Launcher {
                 cmd.arg("-d").arg("-k");
                 if let Some(hint_text) = placeholder {
                     cmd.arg("-p").arg(hint_text);
+                }
+                cmd
+            }
+            LauncherCommand::Bemenu { prompt } => {
+                let mut cmd = Command::new("bemenu");
+                if let Some(hint_text) = prompt {
+                    cmd.arg("-p").arg(format!("{hint_text}: "));
                 }
                 cmd
             }
@@ -210,6 +221,7 @@ impl Launcher {
             LauncherType::Walker => Ok(LauncherCommand::Walker {
                 placeholder: hint_text,
             }),
+            LauncherType::Bemenu => Ok(LauncherCommand::Bemenu { prompt: hint_text }),
             LauncherType::Custom => {
                 if let Some(cmd) = command_str {
                     let processed_cmd = Self::substitute_placeholders(cmd, hint)?;
