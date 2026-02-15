@@ -53,6 +53,7 @@ impl MainMenuOptions {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SettingsMenuOptions {
     SetSampleRate,
+    Back,
 }
 
 impl SettingsMenuOptions {
@@ -61,6 +62,7 @@ impl SettingsMenuOptions {
             s if s == t!("menus.settings.options.set_sample_rate.name") => {
                 Some(SettingsMenuOptions::SetSampleRate)
             }
+            s if s == t!("menus.common.back") => Some(SettingsMenuOptions::Back),
             _ => None,
         }
     }
@@ -70,6 +72,7 @@ impl SettingsMenuOptions {
             SettingsMenuOptions::SetSampleRate => {
                 t!("menus.settings.options.set_sample_rate.name")
             }
+            SettingsMenuOptions::Back => t!("menus.common.back"),
         }
     }
 }
@@ -149,10 +152,15 @@ impl InputDeviceMenuOptions {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProfileMenuOptions {
     SelectProfile(u32),
+    Back,
 }
 
 impl ProfileMenuOptions {
     pub fn from_string_with_profiles(option: &str, profiles: &[Profile]) -> Option<Self> {
+        if option == t!("menus.common.back") {
+            return Some(ProfileMenuOptions::Back);
+        }
+
         profiles
             .iter()
             .find(|profile| profile.description == option)
@@ -165,6 +173,7 @@ pub enum DeviceMenuOptions {
     SetDefault,
     SwitchProfile,
     AdjustVolume,
+    Back,
 }
 
 impl DeviceMenuOptions {
@@ -179,6 +188,7 @@ impl DeviceMenuOptions {
             s if s == t!("menus.device.options.adjust_volume.name") => {
                 Some(DeviceMenuOptions::AdjustVolume)
             }
+            s if s == t!("menus.common.back") => Some(DeviceMenuOptions::Back),
             _ => None,
         }
     }
@@ -188,6 +198,7 @@ impl DeviceMenuOptions {
             DeviceMenuOptions::SetDefault => t!("menus.device.options.set_default.name"),
             DeviceMenuOptions::SwitchProfile => t!("menus.device.options.switch_profile.name"),
             DeviceMenuOptions::AdjustVolume => t!("menus.device.options.adjust_volume.name"),
+            DeviceMenuOptions::Back => t!("menus.common.back"),
         }
     }
 }
@@ -198,6 +209,7 @@ pub enum VolumeMenuOptions {
     Decrease,
     Mute,
     Unmute,
+    Back,
 }
 
 impl VolumeMenuOptions {
@@ -210,6 +222,7 @@ impl VolumeMenuOptions {
             s if s == decrease_text => Some(VolumeMenuOptions::Decrease),
             s if s == t!("menus.volume.options.mute.name") => Some(VolumeMenuOptions::Mute),
             s if s == t!("menus.volume.options.unmute.name") => Some(VolumeMenuOptions::Unmute),
+            s if s == t!("menus.common.back") => Some(VolumeMenuOptions::Back),
             _ => None,
         }
     }
@@ -226,6 +239,7 @@ impl VolumeMenuOptions {
             }
             VolumeMenuOptions::Mute => t!("menus.volume.options.mute.name"),
             VolumeMenuOptions::Unmute => t!("menus.volume.options.unmute.name"),
+            VolumeMenuOptions::Back => t!("menus.common.back"),
         }
     }
 }
@@ -233,10 +247,15 @@ impl VolumeMenuOptions {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SampleRateMenuOptions {
     SelectRate(u32),
+    Back,
 }
 
 impl SampleRateMenuOptions {
     pub fn from_string_with_rates(option: &str, rates: &[u32]) -> Option<Self> {
+        if option == t!("menus.common.back") {
+            return Some(SampleRateMenuOptions::Back);
+        }
+
         for &rate in rates {
             let display_text = format!("{:.1} kHz", rate as f32 / 1000.0);
             if option == display_text {
@@ -409,11 +428,16 @@ impl Menu {
         launcher_command: &Option<String>,
         icon_type: &str,
         spaces: usize,
+        back_on_escape: bool,
     ) -> Result<Option<SettingsMenuOptions>> {
-        let options = vec![(
+        let mut options = vec![(
             "set_sample_rate",
             SettingsMenuOptions::SetSampleRate.to_str(),
         )];
+
+        if !back_on_escape {
+            options.push(("back", t!("menus.common.back").to_string().into()));
+        }
 
         let input = self.get_icon_text(options, icon_type, spaces);
         let hint = t!("menus.settings.hint");
@@ -435,6 +459,7 @@ impl Menu {
         icon_type: &str,
         spaces: usize,
         current_rate: u32,
+        back_on_escape: bool,
     ) -> Result<Option<SampleRateMenuOptions>> {
         let common_rates = [44100, 48000, 96000, 192000];
         let mut options = Vec::new();
@@ -447,6 +472,10 @@ impl Menu {
             }
 
             options.push(("profile", display_name));
+        }
+
+        if !back_on_escape {
+            options.push(("back", t!("menus.common.back").to_string()));
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);
@@ -469,6 +498,7 @@ impl Menu {
         Ok(None)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn show_stream_menu(
         &self,
         launcher_command: &Option<String>,
@@ -477,6 +507,7 @@ impl Menu {
         icon_type: &str,
         spaces: usize,
         is_output: bool,
+        back_on_escape: bool,
     ) -> Result<Option<String>> {
         let refresh_text = StreamMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
@@ -500,6 +531,12 @@ impl Menu {
                 spaces,
             );
             input.push_str(&format!("\n{formatted}"));
+        }
+
+        if !back_on_escape {
+            let back_text = t!("menus.common.back");
+            let back_formatted = self.get_icon_text(vec![("back", back_text)], icon_type, spaces);
+            input.push_str(&format!("\n{back_formatted}"));
         }
 
         let hint = if is_output {
@@ -526,6 +563,7 @@ impl Menu {
         controller: &Controller,
         icon_type: &str,
         spaces: usize,
+        back_on_escape: bool,
     ) -> Result<Option<String>> {
         let refresh_text = OutputDeviceMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
@@ -535,6 +573,12 @@ impl Menu {
         for node in nodes {
             let node_display = self.format_node_display(node, controller, icon_type, spaces);
             input.push_str(&format!("\n{node_display}"));
+        }
+
+        if !back_on_escape {
+            let back_text = t!("menus.common.back");
+            let back_formatted = self.get_icon_text(vec![("back", back_text)], icon_type, spaces);
+            input.push_str(&format!("\n{back_formatted}"));
         }
 
         let hint = t!("menus.output_devices.hint");
@@ -556,6 +600,7 @@ impl Menu {
         controller: &Controller,
         icon_type: &str,
         spaces: usize,
+        back_on_escape: bool,
     ) -> Result<Option<String>> {
         let refresh_text = InputDeviceMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
@@ -565,6 +610,12 @@ impl Menu {
         for node in nodes {
             let node_display = self.format_node_display(node, controller, icon_type, spaces);
             input.push_str(&format!("\n{node_display}"));
+        }
+
+        if !back_on_escape {
+            let back_text = t!("menus.common.back");
+            let back_formatted = self.get_icon_text(vec![("back", back_text)], icon_type, spaces);
+            input.push_str(&format!("\n{back_formatted}"));
         }
 
         let hint = t!("menus.input_devices.hint");
@@ -589,6 +640,7 @@ impl Menu {
         is_default: bool,
         is_output_menu: bool,
         has_profiles: bool,
+        back_on_escape: bool,
     ) -> Result<Option<DeviceMenuOptions>> {
         let mut options = Vec::new();
 
@@ -608,6 +660,11 @@ impl Menu {
 
         options.push((volume_icon_key, DeviceMenuOptions::AdjustVolume.to_str()));
 
+        if !back_on_escape {
+            let back_text = t!("menus.common.back");
+            options.push(("back", back_text));
+        }
+
         let input = self.get_icon_text(options, icon_type, spaces);
         let hint = t!("menus.device.hint", device_name = device_name);
 
@@ -622,6 +679,7 @@ impl Menu {
         Ok(None)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn show_profile_menu(
         &self,
         launcher_command: &Option<String>,
@@ -630,6 +688,7 @@ impl Menu {
         device_name: &str,
         profiles: &[Profile],
         current_profile_index: Option<u32>,
+        back_on_escape: bool,
     ) -> Result<Option<ProfileMenuOptions>> {
         if profiles.is_empty() {
             return Ok(None);
@@ -645,6 +704,10 @@ impl Menu {
             }
 
             options.push(("profile", display_name));
+        }
+
+        if !back_on_escape {
+            options.push(("back", t!("menus.common.back").to_string()));
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);
@@ -676,6 +739,7 @@ impl Menu {
         device_name: &str,
         volume_display: &str,
         step_percent: u8,
+        back_on_escape: bool,
     ) -> Result<Option<VolumeMenuOptions>> {
         let mut options = Vec::new();
 
@@ -737,6 +801,11 @@ impl Menu {
                 "input_mute"
             };
             options.push((mute_key, VolumeMenuOptions::Mute.to_str(None)));
+        }
+
+        if !back_on_escape {
+            let back_text = t!("menus.common.back");
+            options.push(("back", back_text));
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);

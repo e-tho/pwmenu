@@ -133,6 +133,7 @@ pwmenu -l custom --launcher-command "fuzzel -d --placeholder '{hint}'"
 | `-s`, `--spaces`     | Specify icon to text space count (font icons only).       | Any positive integer                                                 | `1`           |
 | `-m`, `--menu`       | Specify the root menu to start in.                        | `output-devices`, `input-devices`, `output-streams`, `input-streams` | `None`        |
 | `--volume-step`      | Specify volume adjustment step as percentage.             | `1-25`                                                               | `5`           |
+| `--back-on-escape`   | Return to previous menu on escape.                        | N/A                                                                  | `false`       |
 
 ## Contributing
 

@@ -16,13 +16,19 @@ use tokio::time::{sleep, Duration};
 
 pub struct App {
     pub running: bool,
+    pub back_on_escape: bool,
     controller: Controller,
     notification_manager: Arc<NotificationManager>,
     volume_step: f32,
 }
 
 impl App {
-    pub async fn new(_menu: Menu, icons: Arc<Icons>, volume_step: f32) -> Result<Self> {
+    pub async fn new(
+        _menu: Menu,
+        icons: Arc<Icons>,
+        volume_step: f32,
+        back_on_escape: bool,
+    ) -> Result<Self> {
         let controller = Controller::new().await?;
         let notification_manager = Arc::new(NotificationManager::new(icons.clone()));
 
@@ -30,6 +36,7 @@ impl App {
 
         Ok(Self {
             running: true,
+            back_on_escape,
             controller,
             notification_manager,
             volume_step,
@@ -184,16 +191,23 @@ impl App {
         spaces: usize,
     ) -> Result<bool> {
         let option = menu
-            .show_settings_menu(menu_command, icon_type, spaces)
+            .show_settings_menu(menu_command, icon_type, spaces, self.back_on_escape)
             .await?;
 
-        if let Some(SettingsMenuOptions::SetSampleRate) = option {
-            self.handle_sample_rate_menu(menu, menu_command, icon_type, spaces)
-                .await?;
-            Ok(true)
-        } else {
-            debug!("Exited settings menu");
-            Ok(false)
+        match option {
+            Some(SettingsMenuOptions::SetSampleRate) => {
+                self.handle_sample_rate_menu(menu, menu_command, icon_type, spaces)
+                    .await?;
+                Ok(true)
+            }
+            Some(SettingsMenuOptions::Back) => Ok(false),
+            None => {
+                if !self.back_on_escape {
+                    self.running = false;
+                }
+                debug!("Exited settings menu");
+                Ok(false)
+            }
         }
     }
 
@@ -229,15 +243,28 @@ impl App {
         let current_rate = self.controller.get_system_default_sample_rate();
 
         let option = menu
-            .show_sample_rate_menu(menu_command, icon_type, spaces, current_rate)
+            .show_sample_rate_menu(
+                menu_command,
+                icon_type,
+                spaces,
+                current_rate,
+                self.back_on_escape,
+            )
             .await?;
 
-        if let Some(SampleRateMenuOptions::SelectRate(sample_rate)) = option {
-            self.perform_sample_rate_change(sample_rate).await?;
-            Ok(true)
-        } else {
-            debug!("Exited sample rate menu");
-            Ok(false)
+        match option {
+            Some(SampleRateMenuOptions::SelectRate(sample_rate)) => {
+                self.perform_sample_rate_change(sample_rate).await?;
+                Ok(true)
+            }
+            Some(SampleRateMenuOptions::Back) => Ok(false),
+            None => {
+                if !self.back_on_escape {
+                    self.running = false;
+                }
+                debug!("Exited sample rate menu");
+                Ok(false)
+            }
         }
     }
 
@@ -307,11 +334,16 @@ impl App {
                 icon_type,
                 spaces,
                 is_output,
+                self.back_on_escape,
             )
             .await?;
 
         match menu_result {
             Some(selection) => {
+                if selection == t!("menus.common.back").as_ref() {
+                    return Ok(false);
+                }
+
                 let refresh_text = StreamMenuOptions::RefreshList.to_str();
                 if selection == refresh_text.as_ref() {
                     Ok(true)
@@ -331,6 +363,9 @@ impl App {
                 }
             }
             None => {
+                if !self.back_on_escape {
+                    self.running = false;
+                }
                 let message = if is_output {
                     t!("notifications.pw.output_streams_menu_exited")
                 } else {
@@ -390,11 +425,22 @@ impl App {
     ) -> Result<bool> {
         let nodes = self.controller.get_output_nodes();
         let menu_result = menu
-            .show_output_device_menu(menu_command, &nodes, &self.controller, icon_type, spaces)
+            .show_output_device_menu(
+                menu_command,
+                &nodes,
+                &self.controller,
+                icon_type,
+                spaces,
+                self.back_on_escape,
+            )
             .await?;
 
         match menu_result {
             Some(selection) => {
+                if selection == t!("menus.common.back").as_ref() {
+                    return Ok(false);
+                }
+
                 let refresh_text = OutputDeviceMenuOptions::RefreshList.to_str();
                 if selection == refresh_text.as_ref() {
                     Ok(true)
@@ -409,6 +455,9 @@ impl App {
                 }
             }
             None => {
+                if !self.back_on_escape {
+                    self.running = false;
+                }
                 debug!("{}", t!("notifications.pw.output_devices_menu_exited"));
                 Ok(false)
             }
@@ -446,11 +495,22 @@ impl App {
     ) -> Result<bool> {
         let nodes = self.controller.get_input_nodes();
         let menu_result = menu
-            .show_input_device_menu(menu_command, &nodes, &self.controller, icon_type, spaces)
+            .show_input_device_menu(
+                menu_command,
+                &nodes,
+                &self.controller,
+                icon_type,
+                spaces,
+                self.back_on_escape,
+            )
             .await?;
 
         match menu_result {
             Some(selection) => {
+                if selection == t!("menus.common.back").as_ref() {
+                    return Ok(false);
+                }
+
                 let refresh_text = InputDeviceMenuOptions::RefreshList.to_str();
                 if selection == refresh_text.as_ref() {
                     Ok(true)
@@ -472,6 +532,9 @@ impl App {
                 }
             }
             None => {
+                if !self.back_on_escape {
+                    self.running = false;
+                }
                 debug!("{}", t!("notifications.pw.input_devices_menu_exited"));
                 Ok(false)
             }
@@ -592,34 +655,38 @@ impl App {
                 node.is_default,
                 is_output,
                 has_profiles,
+                self.back_on_escape,
             )
             .await?;
 
-        if let Some(option) = option {
-            match option {
-                DeviceMenuOptions::SetDefault => {
-                    self.perform_set_default(node, is_output).await?;
-                    Ok(true)
-                }
-                DeviceMenuOptions::SwitchProfile => {
-                    if let Some(device_id) = node.device_id {
-                        self.handle_profile_menu(menu, menu_command, device_id, icon_type, spaces)
-                            .await?;
-                    }
-                    Ok(true)
-                }
-                DeviceMenuOptions::AdjustVolume => {
-                    self.handle_volume_menu(menu, menu_command, node, icon_type, spaces, is_output)
-                        .await?;
-                    Ok(true)
-                }
+        match option {
+            Some(DeviceMenuOptions::SetDefault) => {
+                self.perform_set_default(node, is_output).await?;
+                Ok(true)
             }
-        } else {
-            debug!(
-                "Exited device menu for {}",
-                node.description.as_ref().unwrap_or(&node.name)
-            );
-            Ok(false)
+            Some(DeviceMenuOptions::SwitchProfile) => {
+                if let Some(device_id) = node.device_id {
+                    self.handle_profile_menu(menu, menu_command, device_id, icon_type, spaces)
+                        .await?;
+                }
+                Ok(true)
+            }
+            Some(DeviceMenuOptions::AdjustVolume) => {
+                self.handle_volume_menu(menu, menu_command, node, icon_type, spaces, is_output)
+                    .await?;
+                Ok(true)
+            }
+            Some(DeviceMenuOptions::Back) => Ok(false),
+            None => {
+                if !self.back_on_escape {
+                    self.running = false;
+                }
+                debug!(
+                    "Exited device menu for {}",
+                    node.description.as_ref().unwrap_or(&node.name)
+                );
+                Ok(false)
+            }
         }
     }
 
@@ -667,22 +734,30 @@ impl App {
                 &device_name,
                 &profiles,
                 current_profile.as_ref().map(|p| p.index),
+                self.back_on_escape,
             )
             .await?;
 
-        if let Some(ProfileMenuOptions::SelectProfile(profile_index)) = option {
-            let target_profile = profile_index;
+        match option {
+            Some(ProfileMenuOptions::SelectProfile(profile_index)) => {
+                let target_profile = profile_index;
 
-            self.perform_profile_switch(device_id, profile_index, &device_name, &profiles)
-                .await?;
+                self.perform_profile_switch(device_id, profile_index, &device_name, &profiles)
+                    .await?;
 
-            self.wait_for_profile_change(device_id, target_profile)
-                .await?;
+                self.wait_for_profile_change(device_id, target_profile)
+                    .await?;
 
-            Ok(true)
-        } else {
-            debug!("Exited profile menu for {device_name}");
-            Ok(false)
+                Ok(true)
+            }
+            Some(ProfileMenuOptions::Back) => Ok(false),
+            None => {
+                if !self.back_on_escape {
+                    self.running = false;
+                }
+                debug!("Exited profile menu for {device_name}");
+                Ok(false)
+            }
         }
     }
 
@@ -778,31 +853,38 @@ impl App {
                 &device_name,
                 &volume_display,
                 step_percent,
+                self.back_on_escape,
             )
             .await?;
 
-        if let Some(selected_option) = option {
-            match selected_option {
-                VolumeMenuOptions::Increase => {
-                    self.perform_volume_change(node, self.volume_step).await?;
-                }
-                VolumeMenuOptions::Decrease => {
-                    self.perform_volume_change(node, -self.volume_step).await?;
-                }
-                VolumeMenuOptions::Mute => {
-                    self.perform_mute_toggle(node, true).await?;
-                }
-                VolumeMenuOptions::Unmute => {
-                    self.perform_mute_toggle(node, false).await?;
-                }
+        match option {
+            Some(VolumeMenuOptions::Increase) => {
+                self.perform_volume_change(node, self.volume_step).await?;
+                Ok((true, Some(VolumeMenuOptions::Increase)))
             }
-            Ok((true, Some(selected_option)))
-        } else {
-            debug!(
-                "Exited volume menu for {}",
-                node.description.as_ref().unwrap_or(&node.name)
-            );
-            Ok((false, None))
+            Some(VolumeMenuOptions::Decrease) => {
+                self.perform_volume_change(node, -self.volume_step).await?;
+                Ok((true, Some(VolumeMenuOptions::Decrease)))
+            }
+            Some(VolumeMenuOptions::Mute) => {
+                self.perform_mute_toggle(node, true).await?;
+                Ok((true, Some(VolumeMenuOptions::Mute)))
+            }
+            Some(VolumeMenuOptions::Unmute) => {
+                self.perform_mute_toggle(node, false).await?;
+                Ok((true, Some(VolumeMenuOptions::Unmute)))
+            }
+            Some(VolumeMenuOptions::Back) => Ok((false, None)),
+            None => {
+                if !self.back_on_escape {
+                    self.running = false;
+                }
+                debug!(
+                    "Exited volume menu for {}",
+                    node.description.as_ref().unwrap_or(&node.name)
+                );
+                Ok((false, None))
+            }
         }
     }
 

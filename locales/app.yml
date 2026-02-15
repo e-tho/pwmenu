@@ -1,5 +1,9 @@
 _version: 2
 menus:
+  common:
+    back:
+      en: "Back"
+      fr: "Retour"
   main:
     options:
       output_devices:

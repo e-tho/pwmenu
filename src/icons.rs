@@ -129,6 +129,9 @@ impl Icons {
             IconDefinition::simple("audio-x-generic-symbolic"),
         );
 
+        font_icons.insert("back", '\u{f004d}');
+        xdg_icons.insert("back", IconDefinition::simple("go-previous-symbolic"));
+
         // Output Controls
 
         font_icons.insert("output_volume", '\u{f057e}');

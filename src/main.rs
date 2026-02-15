@@ -84,6 +84,12 @@ async fn main() -> Result<()> {
                 .default_value("5")
                 .help("Volume adjustment step as percentage (1-25)"),
         )
+        .arg(
+            Arg::new("back_on_escape")
+                .long("back-on-escape")
+                .takes_value(false)
+                .help("Return to previous menu on escape instead of exiting"),
+        )
         .get_matches();
 
     let launcher_type: LauncherType = matches
@@ -107,6 +113,8 @@ async fn main() -> Result<()> {
 
     let volume_step = matches.get_one::<u8>("volume_step").copied().unwrap() as f32 / 100.0;
 
+    let back_on_escape = matches.contains_id("back_on_escape");
+
     run_app_loop(
         &menu,
         &command_str,
@@ -115,6 +123,7 @@ async fn main() -> Result<()> {
         icons,
         root_menu,
         volume_step,
+        back_on_escape,
     )
     .await?;
 
@@ -130,8 +139,9 @@ async fn run_app_loop(
     icons: Arc<Icons>,
     root_menu: Option<String>,
     volume_step: f32,
+    back_on_escape: bool,
 ) -> Result<()> {
-    let mut app = App::new(menu.clone(), icons.clone(), volume_step).await?;
+    let mut app = App::new(menu.clone(), icons.clone(), volume_step, back_on_escape).await?;
 
     let result = if let Some(ref menu_name) = root_menu {
         app.wait_for_initialization().await?;
