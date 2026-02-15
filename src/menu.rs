@@ -430,13 +430,13 @@ impl Menu {
         spaces: usize,
         back_on_escape: bool,
     ) -> Result<Option<SettingsMenuOptions>> {
-        let mut options = vec![(
+        let mut options: Vec<(&str, Cow<'static, str>)> = vec![(
             "set_sample_rate",
             SettingsMenuOptions::SetSampleRate.to_str(),
         )];
 
         if !back_on_escape {
-            options.push(("back", t!("menus.common.back").to_string().into()));
+            options.push(("back", t!("menus.common.back")));
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);
@@ -462,7 +462,7 @@ impl Menu {
         back_on_escape: bool,
     ) -> Result<Option<SampleRateMenuOptions>> {
         let common_rates = [44100, 48000, 96000, 192000];
-        let mut options = Vec::new();
+        let mut options: Vec<(&str, Cow<'static, str>)> = Vec::new();
 
         for &rate in &common_rates {
             let mut display_name = format!("{:.1} kHz", rate as f32 / 1000.0);
@@ -471,11 +471,11 @@ impl Menu {
                 display_name.push_str(&format!(" {}", self.icons.get_icon("default", "generic")));
             }
 
-            options.push(("profile", display_name));
+            options.push(("profile", Cow::Owned(display_name)));
         }
 
         if !back_on_escape {
-            options.push(("back", t!("menus.common.back").to_string()));
+            options.push(("back", t!("menus.common.back")));
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);
@@ -694,7 +694,7 @@ impl Menu {
             return Ok(None);
         }
 
-        let mut options = Vec::new();
+        let mut options: Vec<(&str, Cow<'static, str>)> = Vec::new();
 
         for profile in profiles {
             let mut display_name = profile.description.clone();
@@ -703,11 +703,11 @@ impl Menu {
                 display_name.push_str(&format!(" {}", self.icons.get_icon("default", "generic")));
             }
 
-            options.push(("profile", display_name));
+            options.push(("profile", Cow::Owned(display_name)));
         }
 
         if !back_on_escape {
-            options.push(("back", t!("menus.common.back").to_string()));
+            options.push(("back", t!("menus.common.back")));
         }
 
         let input = self.get_icon_text(options, icon_type, spaces);
