@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use clap::{builder::EnumValueParser, value_parser, Arg, Command};
+use clap::{value_parser, Arg, Command};
 use pwmenu::{app::App, icons::Icons, launcher::LauncherType, menu::Menu};
 use rust_i18n::{i18n, set_locale};
 use std::{env, sync::Arc};
@@ -34,14 +34,12 @@ async fn main() -> Result<()> {
                 .short('l')
                 .long("launcher")
                 .required(true)
-                .takes_value(true)
-                .value_parser(EnumValueParser::<LauncherType>::new())
+                .value_parser(clap::value_parser!(LauncherType))
                 .help("Launcher to use"),
         )
         .arg(
             Arg::new("launcher_command")
                 .long("launcher-command")
-                .takes_value(true)
                 .required_if_eq("launcher", "custom")
                 .value_parser(validate_launcher_command)
                 .help("Launcher command to use when --launcher is set to custom"),
@@ -50,8 +48,7 @@ async fn main() -> Result<()> {
             Arg::new("icon")
                 .short('i')
                 .long("icon")
-                .takes_value(true)
-                .possible_values(["font", "xdg"])
+                .value_parser(["font", "xdg"])
                 .default_value("font")
                 .help("Choose the type of icons to use"),
         )
@@ -59,7 +56,6 @@ async fn main() -> Result<()> {
             Arg::new("spaces")
                 .short('s')
                 .long("spaces")
-                .takes_value(true)
                 .default_value("1")
                 .help("Number of spaces between icon and text when using font icons"),
         )
@@ -67,8 +63,7 @@ async fn main() -> Result<()> {
             Arg::new("menu")
                 .short('m')
                 .long("menu")
-                .takes_value(true)
-                .possible_values([
+                .value_parser([
                     "output-devices",
                     "input-devices",
                     "output-streams",
@@ -79,7 +74,6 @@ async fn main() -> Result<()> {
         .arg(
             Arg::new("volume_step")
                 .long("volume-step")
-                .takes_value(true)
                 .value_parser(value_parser!(u8).range(1..=25))
                 .default_value("5")
                 .help("Volume adjustment step as percentage (1-25)"),
@@ -87,19 +81,16 @@ async fn main() -> Result<()> {
         .arg(
             Arg::new("back_on_escape")
                 .long("back-on-escape")
-                .takes_value(false)
+                .action(clap::ArgAction::SetTrue)
                 .help("Return to previous menu on escape instead of exiting"),
         )
         .get_matches();
 
-    let launcher_type: LauncherType = matches
-        .get_one::<LauncherType>("launcher")
-        .cloned()
-        .unwrap();
+    let launcher_type: LauncherType = matches.get_one::<LauncherType>("launcher").unwrap().clone();
 
     let command_str = matches.get_one::<String>("launcher_command").cloned();
 
-    let icon_type = matches.get_one::<String>("icon").cloned().unwrap();
+    let icon_type = matches.get_one::<String>("icon").unwrap().clone();
 
     let root_menu = matches.get_one::<String>("menu").cloned();
 
@@ -113,7 +104,7 @@ async fn main() -> Result<()> {
 
     let volume_step = matches.get_one::<u8>("volume_step").copied().unwrap() as f32 / 100.0;
 
-    let back_on_escape = matches.contains_id("back_on_escape");
+    let back_on_escape = matches.get_flag("back_on_escape");
 
     run_app_loop(
         &menu,
