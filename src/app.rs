@@ -358,6 +358,9 @@ impl App {
                             is_output,
                         )
                         .await?;
+                        if !self.running {
+                            return Ok(false);
+                        }
                     }
                     Ok(true)
                 }
@@ -450,6 +453,9 @@ impl App {
                     if let Some(node) = selected_node {
                         self.handle_device_menu(menu, menu_command, &node, icon_type, spaces, true)
                             .await?;
+                        if !self.running {
+                            return Ok(false);
+                        }
                     }
                     Ok(true)
                 }
@@ -527,6 +533,9 @@ impl App {
                             false,
                         )
                         .await?;
+                        if !self.running {
+                            return Ok(false);
+                        }
                     }
                     Ok(true)
                 }
@@ -669,11 +678,17 @@ impl App {
                     self.handle_profile_menu(menu, menu_command, device_id, icon_type, spaces)
                         .await?;
                 }
+                if !self.running {
+                    return Ok(false);
+                }
                 Ok(true)
             }
             Some(DeviceMenuOptions::AdjustVolume) => {
                 self.handle_volume_menu(menu, menu_command, node, icon_type, spaces, is_output)
                     .await?;
+                if !self.running {
+                    return Ok(false);
+                }
                 Ok(true)
             }
             Some(DeviceMenuOptions::Back) => Ok(false),
