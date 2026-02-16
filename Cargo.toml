@@ -25,7 +25,7 @@ tokio = { version = "1", features = [
 ] }
 clap = { version = "4", features = ["derive"] }
 nix = { version = "0.31", features = ["process", "signal"] }
-process-wrap = { version = "8.2", features = ["std"] }
+process-wrap = { version = "9", features = ["std"] }
 signal-hook = "0.3"
 notify-rust = "4"
 shlex = "1.3"
