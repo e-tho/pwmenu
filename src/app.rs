@@ -906,22 +906,37 @@ impl App {
     async fn perform_set_default(&self, node: &Node, is_output: bool) -> Result<()> {
         let device_type = if is_output { "output" } else { "input" };
 
-        if is_output {
-            self.controller.set_default_sink(node.id).await?;
+        let result = if is_output {
+            self.controller.set_default_sink(node.id).await
         } else {
-            self.controller.set_default_source(node.id).await?;
-        }
+            self.controller.set_default_source(node.id).await
+        };
 
         let display_name = self.controller.get_node_base_name(node);
-        let msg = t!(
-            "notifications.pw.default_set",
-            device_type = device_type,
-            device_name = display_name
-        );
 
-        info!("{msg}");
-        self.notification_manager
-            .send_default_changed_notification(device_type, &display_name)?;
+        match result {
+            Ok(()) => {
+                let msg = t!(
+                    "notifications.pw.default_set",
+                    device_type = device_type,
+                    device_name = display_name
+                );
+                info!("{msg}");
+                self.notification_manager
+                    .send_default_changed_notification(device_type, &display_name)?;
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                info!("{msg}");
+                try_send_notification!(
+                    self.notification_manager,
+                    None,
+                    Some(msg),
+                    Some("output"),
+                    None
+                );
+            }
+        }
 
         Ok(())
     }
@@ -933,25 +948,39 @@ impl App {
         device_name: &str,
         profiles: &[Profile],
     ) -> Result<()> {
-        self.controller
+        match self
+            .controller
             .switch_device_profile(device_id, profile_index)
-            .await?;
-
-        if let Some(profile) = profiles.iter().find(|p| p.index == profile_index) {
-            let msg = t!(
-                "notifications.pw.profile_switched",
-                device_name = device_name,
-                profile_name = &profile.description
-            );
-
-            info!("{msg}");
-            try_send_notification!(
-                self.notification_manager,
-                None,
-                Some(msg.to_string()),
-                Some("switch_profile"),
-                None
-            );
+            .await
+        {
+            Ok(()) => {
+                if let Some(profile) = profiles.iter().find(|p| p.index == profile_index) {
+                    let msg = t!(
+                        "notifications.pw.profile_switched",
+                        device_name = device_name,
+                        profile_name = &profile.description
+                    );
+                    info!("{msg}");
+                    try_send_notification!(
+                        self.notification_manager,
+                        None,
+                        Some(msg.to_string()),
+                        Some("switch_profile"),
+                        None
+                    );
+                }
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                info!("{msg}");
+                try_send_notification!(
+                    self.notification_manager,
+                    None,
+                    Some(msg),
+                    Some("switch_profile"),
+                    None
+                );
+            }
         }
 
         Ok(())
