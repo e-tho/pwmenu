@@ -371,21 +371,6 @@ fn run_pipewire_loop(
                 move |info: &CoreInfo| {
                     store.borrow_mut().set_pwmenu_client_id(info.id());
                     debug!("Core: Info event received for client ID: {}", info.id());
-
-                    let rate = if let Ok(store_ref) = store.try_borrow() {
-                        if let Some(metadata_manager) = &store_ref.metadata_manager {
-                            metadata_manager.get_sample_rate()
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                    let final_rate = rate.unwrap_or(48000);
-
-                    store.borrow_mut().default_clock_rate = final_rate;
-                    debug!("Set default clock rate: {} Hz", final_rate);
                 }
             })
             .error({

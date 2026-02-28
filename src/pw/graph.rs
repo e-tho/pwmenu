@@ -373,6 +373,12 @@ pub fn update_graph(store_rc: &Rc<RefCell<Store>>, graph_tx: &watch::Sender<Audi
         let mut store = store_rc.borrow_mut();
         store.update_defaults_from_metadata();
 
+        if let Some(ref mm) = store.metadata_manager {
+            if let Some(rate) = mm.get_sample_rate() {
+                store.default_clock_rate = rate;
+            }
+        }
+
         if !store.data_complete {
             store.data_complete = store.check_data_completeness();
         }
