@@ -1,6 +1,6 @@
 use libspa::{
     pod::builder::Builder,
-    sys::{spa_pod_frame, SPA_PARAM_Props, SPA_PROP_mute, SPA_PROP_volume},
+    sys::{spa_pod_frame, SPA_PARAM_Props, SPA_PROP_mute},
 };
 use pipewire::spa::{
     param::ParamType,
@@ -82,6 +82,7 @@ pub struct NodeInternal {
     pub info_listener: Option<pipewire::node::NodeListener>,
     pub has_received_params: bool,
     pub media_name: Option<String>,
+    pub channel_count: usize,
 }
 
 impl NodeInternal {
@@ -170,6 +171,7 @@ impl Store {
             info_listener: None,
             has_received_params: false,
             media_name,
+            channel_count: 0,
         };
 
         let store_weak = Rc::downgrade(store_rc);
@@ -312,6 +314,15 @@ impl Store {
                                 updated = true;
                             }
                         }
+                        if let Value::ValueArray(libspa::pod::ValueArray::Float(ref float_vec)) =
+                            prop.value
+                        {
+                            let count = float_vec.len();
+                            if node.channel_count != count {
+                                node.channel_count = count;
+                                updated = true;
+                            }
+                        }
                     }
                     libspa::sys::SPA_PROP_volume => {
                         if let Value::Float(volume) = prop.value {
@@ -343,8 +354,14 @@ impl Store {
             .get_mut(&node_id)
             .ok_or_else(|| anyhow!("Node {node_id} not found for set_node_volume"))?;
 
+        if node.channel_count == 0 {
+            return Err(anyhow!("Channel count not yet known for node {node_id}"));
+        }
+
         let volume_value = volume.clamp(0.0, 2.0);
         let raw_volume = VolumeResolver::apply_inverse_cubic_scaling(volume_value);
+
+        let volumes: Vec<f32> = vec![raw_volume; node.channel_count];
 
         let mut buffer: Vec<u8> = Vec::new();
         let mut builder = Builder::new(&mut buffer);
@@ -358,8 +375,6 @@ impl Store {
             builder
                 .add_prop(libspa::sys::SPA_PROP_channelVolumes, 0)
                 .context("Builder: failed to add channelVolumes property key")?;
-
-            let volumes = [raw_volume; 2];
             builder
                 .add_array(
                     std::mem::size_of::<f32>() as u32,
@@ -377,7 +392,10 @@ impl Store {
         node.proxy.set_param(ParamType::Props, 0, pod_ref);
         node.volume = volume_value;
 
-        debug!("Sent volume command for node {node_id} to {volume_value}");
+        debug!(
+            "Sent volume command for node {node_id} to {volume_value} ({} channels)",
+            node.channel_count
+        );
         Ok(())
     }
 

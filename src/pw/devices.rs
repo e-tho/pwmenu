@@ -112,6 +112,8 @@ pub struct DeviceInternal {
     pub output_route: RouteInfo,
     pub input_route: RouteInfo,
     pub has_route_volume: bool,
+    pub output_channel_count: usize,
+    pub input_channel_count: usize,
 }
 
 impl DeviceInternal {
@@ -273,6 +275,8 @@ impl Store {
             output_route: RouteInfo::default(),
             input_route: RouteInfo::default(),
             has_route_volume: false,
+            output_channel_count: 0,
+            input_channel_count: 0,
         };
 
         self.setup_device_monitoring(&mut device, store_rc, graph_tx);
@@ -428,6 +432,7 @@ impl Store {
             let mut has_volume_props = false;
             let mut route_volume: Option<f32> = None;
             let mut route_muted: Option<bool> = None;
+            let mut route_channel_count: Option<usize> = None;
 
             for prop in &obj.properties {
                 match prop.key {
@@ -452,14 +457,20 @@ impl Store {
                                 match volume_prop.key {
                                     k if k == libspa::sys::SPA_PROP_channelVolumes => {
                                         has_volume_props = true;
-                                        if let Some(raw_volume) =
-                                            VolumeResolver::extract_channel_volume(
-                                                &volume_prop.value,
-                                            )
+                                        if let Value::ValueArray(libspa::pod::ValueArray::Float(
+                                            ref float_vec,
+                                        )) = volume_prop.value
                                         {
-                                            route_volume = Some(
-                                                VolumeResolver::apply_cubic_scaling(raw_volume),
-                                            );
+                                            route_channel_count = Some(float_vec.len());
+                                            if let Some(raw_volume) =
+                                                VolumeResolver::extract_channel_volume(
+                                                    &volume_prop.value,
+                                                )
+                                            {
+                                                route_volume = Some(
+                                                    VolumeResolver::apply_cubic_scaling(raw_volume),
+                                                );
+                                            }
                                         }
                                     }
                                     k if k == libspa::sys::SPA_PROP_volume => {
@@ -504,6 +515,12 @@ impl Store {
                             cache_updated = true;
                         }
                     }
+                    if let Some(count) = route_channel_count {
+                        if device.output_channel_count != count {
+                            device.output_channel_count = count;
+                            cache_updated = true;
+                        }
+                    }
                 } else if direction == 0 {
                     device.input_route.index = Some(index);
                     device.input_route.device = Some(device_num);
@@ -517,6 +534,12 @@ impl Store {
                     if let Some(muted) = route_muted {
                         if device.input_route.muted != Some(muted) {
                             device.input_route.muted = Some(muted);
+                            cache_updated = true;
+                        }
+                    }
+                    if let Some(count) = route_channel_count {
+                        if device.input_channel_count != count {
+                            device.input_channel_count = count;
                             cache_updated = true;
                         }
                     }
@@ -806,26 +829,45 @@ impl Store {
         };
 
         if let Some(direction) = target_direction {
-            let (route_index, route_device) = {
+            let (route_index, route_device, channel_count) = {
                 let device = self
                     .devices
                     .get(&device_id)
                     .ok_or_else(|| anyhow!("Device {device_id} not found"))?;
 
+                let count = match direction {
+                    RouteDirection::Output => device.output_channel_count,
+                    RouteDirection::Input => device.input_channel_count,
+                };
+
+                if count == 0 {
+                    return Err(anyhow!(
+                        "Channel count not yet known for device {device_id}"
+                    ));
+                }
+
                 match direction {
-                    RouteDirection::Output => device.output_route.get_route_params().unwrap(),
-                    RouteDirection::Input => device.input_route.get_route_params().unwrap(),
+                    RouteDirection::Output => (
+                        device.output_route.get_route_params().unwrap().0,
+                        device.output_route.get_route_params().unwrap().1,
+                        count,
+                    ),
+                    RouteDirection::Input => (
+                        device.input_route.get_route_params().unwrap().0,
+                        device.input_route.get_route_params().unwrap().1,
+                        count,
+                    ),
                 }
             };
 
             let raw_volume = VolumeResolver::apply_inverse_cubic_scaling(volume.clamp(0.0, 2.0));
+            let volumes: Vec<f32> = vec![raw_volume; channel_count];
 
             let buffer = self.build_route_parameter_pod(route_index, route_device, |builder| {
                 builder
                     .add_prop(libspa::sys::SPA_PROP_channelVolumes, 0)
                     .context("Failed to add channelVolumes property")?;
 
-                let volumes = [raw_volume; 2];
                 unsafe {
                     builder
                         .add_array(
