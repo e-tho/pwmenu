@@ -16,7 +16,7 @@ use tokio::time::{sleep, Duration};
 
 pub struct App {
     pub running: bool,
-    pub back_on_escape: bool,
+    pub interactive: bool,
     controller: Controller,
     notification_manager: Arc<NotificationManager>,
     volume_step: f32,
@@ -27,7 +27,7 @@ impl App {
         _menu: Menu,
         icons: Arc<Icons>,
         volume_step: f32,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Self> {
         let controller = Controller::new().await?;
         let notification_manager = Arc::new(NotificationManager::new(icons.clone()));
@@ -36,7 +36,7 @@ impl App {
 
         Ok(Self {
             running: true,
-            back_on_escape,
+            interactive,
             controller,
             notification_manager,
             volume_step,
@@ -191,18 +191,22 @@ impl App {
         spaces: usize,
     ) -> Result<bool> {
         let option = menu
-            .show_settings_menu(menu_command, icon_type, spaces, self.back_on_escape)
+            .show_settings_menu(menu_command, icon_type, spaces, self.interactive)
             .await?;
 
         match option {
             Some(SettingsMenuOptions::SetSampleRate) => {
                 self.handle_sample_rate_menu(menu, menu_command, icon_type, spaces)
                     .await?;
+                if !self.interactive {
+                    self.running = false;
+                    return Ok(false);
+                }
                 Ok(true)
             }
             Some(SettingsMenuOptions::Back) => Ok(false),
             None => {
-                if !self.back_on_escape {
+                if !self.interactive {
                     self.running = false;
                 }
                 debug!("Exited settings menu");
@@ -248,18 +252,22 @@ impl App {
                 icon_type,
                 spaces,
                 current_rate,
-                self.back_on_escape,
+                self.interactive,
             )
             .await?;
 
         match option {
             Some(SampleRateMenuOptions::SelectRate(sample_rate)) => {
                 self.perform_sample_rate_change(sample_rate).await?;
+                if !self.interactive {
+                    self.running = false;
+                    return Ok(false);
+                }
                 Ok(true)
             }
             Some(SampleRateMenuOptions::Back) => Ok(false),
             None => {
-                if !self.back_on_escape {
+                if !self.interactive {
                     self.running = false;
                 }
                 debug!("Exited sample rate menu");
@@ -334,7 +342,7 @@ impl App {
                 icon_type,
                 spaces,
                 is_output,
-                self.back_on_escape,
+                self.interactive,
             )
             .await?;
 
@@ -361,12 +369,16 @@ impl App {
                         if !self.running {
                             return Ok(false);
                         }
+                        if !self.interactive {
+                            self.running = false;
+                            return Ok(false);
+                        }
                     }
                     Ok(true)
                 }
             }
             None => {
-                if !self.back_on_escape {
+                if !self.interactive {
                     self.running = false;
                 }
                 let message = if is_output {
@@ -374,7 +386,6 @@ impl App {
                 } else {
                     t!("notifications.pw.input_streams_menu_exited")
                 };
-
                 debug!("{message}");
                 Ok(false)
             }
@@ -434,7 +445,7 @@ impl App {
                 &self.controller,
                 icon_type,
                 spaces,
-                self.back_on_escape,
+                self.interactive,
             )
             .await?;
 
@@ -461,7 +472,7 @@ impl App {
                 }
             }
             None => {
-                if !self.back_on_escape {
+                if !self.interactive {
                     self.running = false;
                 }
                 debug!("{}", t!("notifications.pw.output_devices_menu_exited"));
@@ -507,7 +518,7 @@ impl App {
                 &self.controller,
                 icon_type,
                 spaces,
-                self.back_on_escape,
+                self.interactive,
             )
             .await?;
 
@@ -541,7 +552,7 @@ impl App {
                 }
             }
             None => {
-                if !self.back_on_escape {
+                if !self.interactive {
                     self.running = false;
                 }
                 debug!("{}", t!("notifications.pw.input_devices_menu_exited"));
@@ -664,13 +675,17 @@ impl App {
                 node.is_default,
                 is_output,
                 has_profiles,
-                self.back_on_escape,
+                self.interactive,
             )
             .await?;
 
         match option {
             Some(DeviceMenuOptions::SetDefault) => {
                 self.perform_set_default(node, is_output).await?;
+                if !self.interactive {
+                    self.running = false;
+                    return Ok(false);
+                }
                 Ok(true)
             }
             Some(DeviceMenuOptions::SwitchProfile) => {
@@ -681,7 +696,10 @@ impl App {
                 if !self.running {
                     return Ok(false);
                 }
-                Ok(true)
+                if !self.interactive {
+                    self.running = false;
+                }
+                Ok(false)
             }
             Some(DeviceMenuOptions::AdjustVolume) => {
                 self.handle_volume_menu(menu, menu_command, node, icon_type, spaces, is_output)
@@ -689,11 +707,14 @@ impl App {
                 if !self.running {
                     return Ok(false);
                 }
-                Ok(true)
+                if !self.interactive {
+                    self.running = false;
+                }
+                Ok(false)
             }
             Some(DeviceMenuOptions::Back) => Ok(false),
             None => {
-                if !self.back_on_escape {
+                if !self.interactive {
                     self.running = false;
                 }
                 debug!(
@@ -749,25 +770,25 @@ impl App {
                 &device_name,
                 &profiles,
                 current_profile.as_ref().map(|p| p.index),
-                self.back_on_escape,
+                self.interactive,
             )
             .await?;
 
         match option {
             Some(ProfileMenuOptions::SelectProfile(profile_index)) => {
                 let target_profile = profile_index;
-
                 self.perform_profile_switch(device_id, profile_index, &device_name, &profiles)
                     .await?;
-
                 self.wait_for_profile_change(device_id, target_profile)
                     .await?;
-
-                Ok(true)
+                if !self.interactive {
+                    self.running = false;
+                }
+                Ok(false)
             }
             Some(ProfileMenuOptions::Back) => Ok(false),
             None => {
-                if !self.back_on_escape {
+                if !self.interactive {
                     self.running = false;
                 }
                 debug!("Exited profile menu for {device_name}");
@@ -868,7 +889,7 @@ impl App {
                 &device_name,
                 &volume_display,
                 step_percent,
-                self.back_on_escape,
+                self.interactive,
             )
             .await?;
 
@@ -891,7 +912,7 @@ impl App {
             }
             Some(VolumeMenuOptions::Back) => Ok((false, None)),
             None => {
-                if !self.back_on_escape {
+                if !self.interactive {
                     self.running = false;
                 }
                 debug!(

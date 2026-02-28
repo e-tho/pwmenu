@@ -79,10 +79,10 @@ async fn main() -> Result<()> {
                 .help("Volume adjustment step as percentage (1-25)"),
         )
         .arg(
-            Arg::new("back_on_escape")
-                .long("back-on-escape")
+            Arg::new("interactive")
+                .long("interactive")
                 .action(clap::ArgAction::SetTrue)
-                .help("Return to previous menu on escape instead of exiting"),
+                .help("Stay in menus after actions and return to previous menu on escape"),
         )
         .get_matches();
 
@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
 
     let volume_step = matches.get_one::<u8>("volume_step").copied().unwrap() as f32 / 100.0;
 
-    let back_on_escape = matches.get_flag("back_on_escape");
+    let interactive = matches.get_flag("interactive");
 
     run_app_loop(
         &menu,
@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
         icons,
         root_menu,
         volume_step,
-        back_on_escape,
+        interactive,
     )
     .await?;
 
@@ -130,9 +130,9 @@ async fn run_app_loop(
     icons: Arc<Icons>,
     root_menu: Option<String>,
     volume_step: f32,
-    back_on_escape: bool,
+    interactive: bool,
 ) -> Result<()> {
-    let mut app = App::new(menu.clone(), icons.clone(), volume_step, back_on_escape).await?;
+    let mut app = App::new(menu.clone(), icons.clone(), volume_step, interactive).await?;
 
     let result = if let Some(ref menu_name) = root_menu {
         app.wait_for_initialization().await?;

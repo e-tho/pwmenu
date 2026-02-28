@@ -428,14 +428,14 @@ impl Menu {
         launcher_command: &Option<String>,
         icon_type: &str,
         spaces: usize,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Option<SettingsMenuOptions>> {
         let mut options: Vec<(&str, Cow<'static, str>)> = vec![(
             "set_sample_rate",
             SettingsMenuOptions::SetSampleRate.to_str(),
         )];
 
-        if !back_on_escape {
+        if !interactive {
             options.push(("back", t!("menus.common.back")));
         }
 
@@ -459,7 +459,7 @@ impl Menu {
         icon_type: &str,
         spaces: usize,
         current_rate: u32,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Option<SampleRateMenuOptions>> {
         let common_rates = [44100, 48000, 96000, 192000];
         let mut options: Vec<(&str, Cow<'static, str>)> = Vec::new();
@@ -474,7 +474,7 @@ impl Menu {
             options.push(("profile", Cow::Owned(display_name)));
         }
 
-        if !back_on_escape {
+        if !interactive {
             options.push(("back", t!("menus.common.back")));
         }
 
@@ -507,7 +507,7 @@ impl Menu {
         icon_type: &str,
         spaces: usize,
         is_output: bool,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Option<String>> {
         let refresh_text = StreamMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
@@ -533,7 +533,7 @@ impl Menu {
             input.push_str(&format!("\n{formatted}"));
         }
 
-        if !back_on_escape {
+        if !interactive {
             let back_text = t!("menus.common.back");
             let back_formatted = self.get_icon_text(vec![("back", back_text)], icon_type, spaces);
             input.push_str(&format!("\n{back_formatted}"));
@@ -563,7 +563,7 @@ impl Menu {
         controller: &Controller,
         icon_type: &str,
         spaces: usize,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Option<String>> {
         let refresh_text = OutputDeviceMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
@@ -575,7 +575,7 @@ impl Menu {
             input.push_str(&format!("\n{node_display}"));
         }
 
-        if !back_on_escape {
+        if !interactive {
             let back_text = t!("menus.common.back");
             let back_formatted = self.get_icon_text(vec![("back", back_text)], icon_type, spaces);
             input.push_str(&format!("\n{back_formatted}"));
@@ -600,7 +600,7 @@ impl Menu {
         controller: &Controller,
         icon_type: &str,
         spaces: usize,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Option<String>> {
         let refresh_text = InputDeviceMenuOptions::RefreshList.to_str();
         let options_start = vec![("refresh", refresh_text.as_ref())];
@@ -612,7 +612,7 @@ impl Menu {
             input.push_str(&format!("\n{node_display}"));
         }
 
-        if !back_on_escape {
+        if !interactive {
             let back_text = t!("menus.common.back");
             let back_formatted = self.get_icon_text(vec![("back", back_text)], icon_type, spaces);
             input.push_str(&format!("\n{back_formatted}"));
@@ -640,7 +640,7 @@ impl Menu {
         is_default: bool,
         is_output_menu: bool,
         has_profiles: bool,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Option<DeviceMenuOptions>> {
         let mut options = Vec::new();
 
@@ -660,7 +660,7 @@ impl Menu {
 
         options.push((volume_icon_key, DeviceMenuOptions::AdjustVolume.to_str()));
 
-        if !back_on_escape {
+        if !interactive {
             let back_text = t!("menus.common.back");
             options.push(("back", back_text));
         }
@@ -688,7 +688,7 @@ impl Menu {
         device_name: &str,
         profiles: &[Profile],
         current_profile_index: Option<u32>,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Option<ProfileMenuOptions>> {
         if profiles.is_empty() {
             return Ok(None);
@@ -706,7 +706,7 @@ impl Menu {
             options.push(("profile", Cow::Owned(display_name)));
         }
 
-        if !back_on_escape {
+        if !interactive {
             options.push(("back", t!("menus.common.back")));
         }
 
@@ -739,7 +739,7 @@ impl Menu {
         device_name: &str,
         volume_display: &str,
         step_percent: u8,
-        back_on_escape: bool,
+        interactive: bool,
     ) -> Result<Option<VolumeMenuOptions>> {
         let mut options = Vec::new();
 
@@ -803,7 +803,7 @@ impl Menu {
             options.push((mute_key, VolumeMenuOptions::Mute.to_str(None)));
         }
 
-        if !back_on_escape {
+        if !interactive {
             let back_text = t!("menus.common.back");
             options.push(("back", back_text));
         }
