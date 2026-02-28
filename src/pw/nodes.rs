@@ -303,15 +303,13 @@ impl Store {
             for prop in &obj.properties {
                 match prop.key {
                     libspa::sys::SPA_PROP_channelVolumes => {
-                        if matches!(node.node_type, NodeType::AudioSink | NodeType::AudioSource) {
-                            if let Some(raw_volume) =
-                                VolumeResolver::extract_channel_volume(&prop.value)
-                            {
-                                let scaled_volume = VolumeResolver::apply_cubic_scaling(raw_volume);
-                                if (node.volume - scaled_volume).abs() > 0.001 {
-                                    node.volume = scaled_volume;
-                                    updated = true;
-                                }
+                        if let Some(raw_volume) =
+                            VolumeResolver::extract_channel_volume(&prop.value)
+                        {
+                            let scaled_volume = VolumeResolver::apply_cubic_scaling(raw_volume);
+                            if (node.volume - scaled_volume).abs() > 0.001 {
+                                node.volume = scaled_volume;
+                                updated = true;
                             }
                         }
                     }
@@ -346,6 +344,7 @@ impl Store {
             .ok_or_else(|| anyhow!("Node {node_id} not found for set_node_volume"))?;
 
         let volume_value = volume.clamp(0.0, 2.0);
+        let raw_volume = VolumeResolver::apply_inverse_cubic_scaling(volume_value);
 
         let mut buffer: Vec<u8> = Vec::new();
         let mut builder = Builder::new(&mut buffer);
@@ -357,11 +356,18 @@ impl Store {
                 .context("Builder: failed to push object for volume")?;
             let initialized_frame = frame.assume_init_mut();
             builder
-                .add_prop(SPA_PROP_volume, 0)
-                .context("Builder: failed to add volume property key")?;
+                .add_prop(libspa::sys::SPA_PROP_channelVolumes, 0)
+                .context("Builder: failed to add channelVolumes property key")?;
+
+            let volumes = [raw_volume; 2];
             builder
-                .add_float(volume_value)
-                .context("Builder: failed to add volume float value")?;
+                .add_array(
+                    std::mem::size_of::<f32>() as u32,
+                    pipewire::spa::utils::SpaTypes::Float.as_raw(),
+                    volumes.len() as u32,
+                    volumes.as_ptr() as *const std::ffi::c_void,
+                )
+                .context("Builder: failed to add channelVolumes array")?;
             builder.pop(initialized_frame);
         }
 
