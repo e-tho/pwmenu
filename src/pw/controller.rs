@@ -557,7 +557,7 @@ impl Controller {
             .flat_map(|n| graph.ports.values().filter(|p| p.node_id == n.id))
             .collect::<Vec<_>>();
 
-        all_ports.sort_by(|a, b| a.id.cmp(&b.id));
+        all_ports.sort_by_key(|a| a.id);
 
         if let Some(pos) = all_ports.iter().position(|p| p.id == node_ports[0].id) {
             return Some(pos + 1);

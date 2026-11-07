@@ -1057,7 +1057,7 @@ impl App {
             t!("notifications.pw.device_unmuted")
         };
 
-        info!("{} {}", &summary, &display_name);
+        info!("{} {}", summary, display_name);
         self.notification_manager.send_volume_notification(
             &display_name,
             node.volume.percent(),
